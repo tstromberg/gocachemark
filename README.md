@@ -20,7 +20,8 @@ gocachemark -all         # Run all benchmarks
 
 ### Options
 
-- `-html <file>` - Output results to HTML file with bar charts (default: temp dir)
+- `-html <file>` - Output results to HTML file with charts (default: temp dir)
+- `-open` - Open HTML report in browser after generation
 - `-caches <list>` - Comma-separated caches to benchmark (default: all)
 - `-tests <list>` - Comma-separated tests to run (default: all)
 
@@ -36,7 +37,7 @@ gocachemark -all         # Run all benchmarks
 ```bash
 gocachemark -latency -tests int -caches otter,sfcache
 gocachemark -hitrate -tests cdn,zipf
-gocachemark -all -caches otter,theine -html results.html
+gocachemark -all -caches otter,theine -html results.html -open
 ```
 
 ## Benchmarks
@@ -65,6 +66,7 @@ Memory overhead per cached item, measured in isolated processes for accuracy.
 - [sfcache](https://github.com/codeGROOVE-dev/sfcache) - High-performance cache with W-TinyLFU
 - [otter](https://github.com/maypok86/otter) - High-performance cache with S3-FIFO eviction
 - [theine](https://github.com/Yiling-J/theine-go) - High-performance in-memory cache
+- [ttlcache](https://github.com/jellydator/ttlcache) - Cache with per-item TTL support
 - [ristretto](https://github.com/dgraph-io/ristretto) - Fast concurrent cache from Dgraph
 - [tinylfu](https://github.com/vmihailenco/go-tinylfu) - TinyLFU admission policy
 - [sieve](https://github.com/scalalang2/golang-fifo) - SIEVE eviction algorithm

@@ -562,7 +562,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             order: 3;
             background: #CD7F32;
             border-color: #B87333;
-            color: white;
+            color: #000;
         }
         .medal {
             font-size: 2.5em;
@@ -842,7 +842,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
 {{if .Rankings}}
     <div class="section-header">
-        <h2>🏆 Overall Winners</h2>
+        <h2>Overall Winners</h2>
         <p style="margin: 10px 0 0 0; color: #666;">Ranked voting across all benchmarks</p>
     </div>
 
@@ -856,7 +856,6 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             {{$heightPx = printf "%.0f" (mul (div $r.Score $maxScore) 200.0)}}
         {{end}}
         <div class="podium-item {{if eq $i 0}}first{{else if eq $i 1}}second{{else}}third{{end}}" style="height: {{$heightPx}}px;">
-            <span class="medal">{{if eq $i 0}}🥇{{else if eq $i 1}}🥈{{else}}🥉{{end}}</span>
             <div class="rank">{{if eq $i 0}}1st Place{{else if eq $i 1}}2nd Place{{else}}3rd Place{{end}}</div>
             <div class="cache-name">{{$r.Name}}</div>
             <div class="score">{{printf "%.0f" $r.Score}} points</div>
@@ -867,19 +866,19 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{end}}
 
 <div class="toc">
-    <h2>📑 Table of Contents</h2>
+    <h2>Table of Contents</h2>
     <ul>
-        {{if .HitRate}}<li><a href="#hitrate"><span class="icon">📊</span> Hit Rate Benchmarks</a></li>{{end}}
-        {{if .Latency}}<li><a href="#latency"><span class="icon">⚡</span> Latency Benchmarks</a></li>{{end}}
-        {{if .Throughput}}<li><a href="#throughput"><span class="icon">🔥</span> Throughput Benchmarks</a></li>{{end}}
-        {{if .Memory}}<li><a href="#memory"><span class="icon">💾</span> Memory Benchmarks</a></li>{{end}}
+        {{if .HitRate}}<li><a href="#hitrate">Hit Rate Benchmarks</a></li>{{end}}
+        {{if .Latency}}<li><a href="#latency">Latency Benchmarks</a></li>{{end}}
+        {{if .Throughput}}<li><a href="#throughput">Throughput Benchmarks</a></li>{{end}}
+        {{if .Memory}}<li><a href="#memory">Memory Benchmarks</a></li>{{end}}
     </ul>
 </div>
 
 {{if .HitRate}}
 <div class="collapsible-section" id="hitrate">
     <div class="section-toggle" onclick="toggleSection(this)">
-        <h2>📊 Hit Rate Benchmarks</h2>
+        <h2>Hit Rate Benchmarks</h2>
         <span class="toggle-icon">▼</span>
     </div>
     <div class="section-content">
@@ -1029,7 +1028,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{if .Latency}}
 <div class="collapsible-section" id="latency">
     <div class="section-toggle" onclick="toggleSection(this)">
-        <h2>⚡ Latency Benchmarks (Single-Threaded)</h2>
+        <h2>Latency Benchmarks (Single-Threaded)</h2>
         <span class="toggle-icon">▼</span>
     </div>
     <div class="section-content">
@@ -1174,7 +1173,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{if .Throughput}}
 <div class="collapsible-section" id="throughput">
     <div class="section-toggle" onclick="toggleSection(this)">
-        <h2>🔥 Throughput Benchmarks (Multi-Threaded)</h2>
+        <h2>Throughput Benchmarks (Multi-Threaded)</h2>
         <span class="toggle-icon">▼</span>
     </div>
     <div class="section-content">
@@ -1243,7 +1242,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{if .Memory}}
 <div class="collapsible-section" id="memory">
     <div class="section-toggle" onclick="toggleSection(this)">
-        <h2>💾 Memory Overhead Benchmarks</h2>
+        <h2>Memory Overhead Benchmarks</h2>
         <span class="toggle-icon">▼</span>
     </div>
     <div class="section-content">

@@ -22,7 +22,7 @@ var DefaultThreadCounts = []int{1, 8, 16, 32}
 const (
 	throughputCacheSize    = 10000
 	throughputWorkloadSize = 1_000_000
-	throughputAlpha        = 0.99
+	throughputAlpha        = 0.8
 	benchmarkDuration      = 1 * time.Second
 	opsBatchSize           = 1000
 )
@@ -114,9 +114,21 @@ func measureQPS(factory cache.Factory, keys []int, threads int) float64 {
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-	wg.Wait()
 
-	return float64(ops.Load()) / benchmarkDuration.Seconds()
+	// Wait with timeout to detect hangs
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		// Benchmark hung - return 0 to indicate failure
+		return 0
+	}
 }
 
 func measureIntQPS(factory cache.IntFactory, keys []int, threads int) float64 {
@@ -158,9 +170,21 @@ func measureIntQPS(factory cache.IntFactory, keys []int, threads int) float64 {
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-	wg.Wait()
 
-	return float64(ops.Load()) / benchmarkDuration.Seconds()
+	// Wait with timeout to detect hangs
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		// Benchmark hung - return 0 to indicate failure
+		return 0
+	}
 }
 
 // RunGetOrSetThroughput benchmarks GetOrSet throughput at various thread counts (string keys).
@@ -259,9 +283,21 @@ func measureGetOrSetQPS(factory cache.Factory, keys []int, threads int) float64 
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-	wg.Wait()
 
-	return float64(ops.Load()) / benchmarkDuration.Seconds()
+	// Wait with timeout to detect hangs
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		// Benchmark hung - return 0 to indicate failure
+		return 0
+	}
 }
 
 func measureIntGetOrSetQPS(factory cache.IntFactory, keys []int, threads int) float64 {
@@ -304,7 +340,19 @@ func measureIntGetOrSetQPS(factory cache.IntFactory, keys []int, threads int) fl
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-	wg.Wait()
 
-	return float64(ops.Load()) / benchmarkDuration.Seconds()
+	// Wait with timeout to detect hangs
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		// Benchmark hung - return 0 to indicate failure
+		return 0
+	}
 }

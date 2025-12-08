@@ -596,7 +596,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             border: none;
         }
         .section-header p {
-            margin: 5px 0 0 0;
+            margin: 10px 0 0 0;
             color: #666;
             font-size: 0.9em;
         }
@@ -646,9 +646,6 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             justify-content: space-between;
             user-select: none;
         }
-        .section-toggle:hover {
-            background: #eee;
-        }
         .section-toggle h2 {
             margin: 0;
             color: #000;
@@ -658,20 +655,15 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         }
         .section-toggle .toggle-icon {
             font-size: 1.5em;
-            transition: transform 0.3s;
         }
         .section-toggle.collapsed .toggle-icon {
             transform: rotate(-90deg);
         }
         .section-content {
             padding: 30px;
-            max-height: 10000px;
-            transition: max-height 0.3s ease, padding 0.3s ease;
-            overflow: hidden;
         }
         .section-content.collapsed {
-            max-height: 0;
-            padding: 0 30px;
+            display: none;
         }
         .suite-description {
             margin: 0 0 20px 0;
@@ -761,7 +753,6 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-weight: 500;
         }
-        tr:hover { background: #fafafa; }
         .best { font-weight: bold; }
         th.sortable {
             cursor: pointer;
@@ -843,7 +834,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{if .Rankings}}
     <div class="section-header">
         <h2>Overall Winners</h2>
-        <p style="margin: 10px 0 0 0; color: #666;">Ranked voting across all benchmarks</p>
+        <p>Ranked voting across all benchmarks</p>
     </div>
 
     <div class="podium-container">
@@ -889,7 +880,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.CDN}}
     <h3>CDN Production Trace</h3>
-    <p style="color: #666; margin: 5px 0 15px 0;">2M operations, ~768K unique keys</p>
+    <p class="suite-description">2M operations, ~768K unique keys</p>
     <div class="line-chart-container">
         <canvas id="cdnChart"></canvas>
     </div>
@@ -916,7 +907,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Meta}}
     <h3 style="margin-top: 50px;">Meta KVCache Production Trace</h3>
-    <p style="color: #666; margin: 5px 0 15px 0;">5M operations</p>
+    <p class="suite-description">5M operations</p>
     <div class="line-chart-container">
         <canvas id="metaChart"></canvas>
     </div>
@@ -943,7 +934,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Zipf}}
     <h3 style="margin-top: 50px;">Zipf Synthetic Trace</h3>
-    <p style="color: #666; margin: 5px 0 15px 0;">alpha=0.8, 2M operations, 100K keyspace</p>
+    <p class="suite-description">alpha=0.8, 2M operations, 100K keyspace</p>
     <div class="line-chart-container">
         <canvas id="zipfChart"></canvas>
     </div>
@@ -970,7 +961,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Twitter}}
     <h3 style="margin-top: 50px;">Twitter Production Cache Trace</h3>
-    <p style="color: #666; margin: 5px 0 15px 0;">2M operations, cluster001+cluster052</p>
+    <p class="suite-description">2M operations, cluster001+cluster052</p>
     <div class="line-chart-container">
         <canvas id="twitterChart"></canvas>
     </div>
@@ -997,7 +988,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Wikipedia}}
     <h3 style="margin-top: 50px;">Wikipedia CDN Upload Trace</h3>
-    <p style="color: #666; margin: 5px 0 15px 0;">2M operations, upload.wikimedia.org</p>
+    <p class="suite-description">2M operations, upload.wikimedia.org</p>
     <div class="line-chart-container">
         <canvas id="wikipediaChart"></canvas>
     </div>
@@ -1382,13 +1373,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Smooth scroll for TOC links
+    // TOC links
     document.querySelectorAll('.toc a').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const target = document.querySelector(link.getAttribute('href'));
             if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.scrollIntoView({ block: 'start' });
                 // Expand the section if collapsed
                 const content = target.querySelector('.section-content');
                 const toggle = target.querySelector('.section-toggle');

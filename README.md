@@ -1,6 +1,6 @@
 # gocachemark
 
-A benchmarking tool for comparing Go cache implementations.
+A modern (2025) benchmarking tool for comparing Go cache implementations.
 
 ## Installation
 

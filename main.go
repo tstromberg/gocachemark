@@ -105,7 +105,8 @@ func main() {
 		results.Memory = runMemoryBenchmarks()
 	}
 
-	printOverallRanking(results)
+	results.Rankings = computeOverallRanking(results)
+	printOverallRanking(results.Rankings)
 
 	htmlPath := *htmlOut
 	if htmlPath == "" {
@@ -496,7 +497,7 @@ func runMemoryBenchmarks() *output.MemoryData {
 	return &output.MemoryData{Results: results, Capacity: capacity, ValSize: valSize}
 }
 
-func printOverallRanking(results output.Results) {
+func computeOverallRanking(results output.Results) []output.Ranking {
 	scores := make(map[string]float64)
 
 	// Assign points based on ranking position in each test
@@ -655,7 +656,7 @@ func printOverallRanking(results output.Results) {
 
 	// No tests were run
 	if len(scores) == 0 {
-		return
+		return nil
 	}
 
 	// Sort caches by score
@@ -671,16 +672,34 @@ func printOverallRanking(results output.Results) {
 		return rankings[i].score > rankings[j].score
 	})
 
+	// Convert to output.Ranking slice
+	var result []output.Ranking
+	for i, r := range rankings {
+		result = append(result, output.Ranking{
+			Rank:  i + 1,
+			Name:  r.name,
+			Score: r.score,
+		})
+	}
+	return result
+}
+
+func printOverallRanking(rankings []output.Ranking) {
+	if len(rankings) == 0 {
+		return
+	}
+
 	// Print top 3
 	fmt.Println("=" + strings.Repeat("=", 79))
 	fmt.Println("OVERALL RANKING (ranked voting across all tests)")
 	fmt.Println("=" + strings.Repeat("=", 79))
 	fmt.Println()
 
+	medals := []string{"🥇", "🥈", "🥉"}
 	for i := 0; i < len(rankings) && i < 3; i++ {
 		r := rankings[i]
-		medal := []string{"🥇", "🥈", "🥉"}[i]
-		fmt.Printf("%s #%d: %s (%.0f points)\n", medal, i+1, r.name, r.score)
+		medal := medals[i]
+		fmt.Printf("%s #%d: %s (%.0f points)\n", medal, r.Rank, r.Name, r.Score)
 	}
 	fmt.Println()
 }

@@ -21,6 +21,9 @@ var testFilter map[string]bool
 // cacheSizes holds the cache sizes to benchmark.
 var cacheSizes []int
 
+// threadCounts holds the thread counts for throughput benchmarks.
+var threadCounts []int
+
 func main() {
 	hitRate := flag.Bool("hitrate", false, "Run hit rate benchmarks (CDN, Meta, Zipf traces)")
 	latency := flag.Bool("latency", false, "Run single-threaded latency benchmarks (ns/op)")
@@ -31,6 +34,7 @@ func main() {
 	caches := flag.String("caches", "", "Comma-separated list of caches to benchmark (default: all)")
 	tests := flag.String("tests", "", "Comma-separated list of hit rate tests: cdn,meta,zipf (default: all)")
 	sizes := flag.String("sizes", "", "Comma-separated cache sizes in K (e.g., 16,32,64,128,256)")
+	threads := flag.String("threads", "", "Comma-separated thread counts for throughput (e.g., 8,16)")
 	flag.Parse()
 
 	if !*hitRate && !*latency && !*throughput && !*memory && !*all {
@@ -64,6 +68,19 @@ func main() {
 			var size int
 			if _, err := fmt.Sscanf(s, "%d", &size); err == nil {
 				cacheSizes = append(cacheSizes, size*1024)
+			}
+		}
+	}
+
+	// Apply thread counts
+	threadCounts = benchmark.DefaultThreadCounts
+	if *threads != "" {
+		threadCounts = nil
+		for _, t := range strings.Split(*threads, ",") {
+			t = strings.TrimSpace(t)
+			var count int
+			if _, err := fmt.Sscanf(t, "%d", &count); err == nil {
+				threadCounts = append(threadCounts, count)
 			}
 		}
 	}
@@ -110,10 +127,11 @@ func printUsage() {
 	fmt.Println("  gocachemark -all         Run all benchmarks")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -html <file>   Output results to HTML file (default: temp dir)")
-	fmt.Println("  -caches <list> Comma-separated caches to benchmark (default: all)")
-	fmt.Println("  -tests <list>  Comma-separated tests to run (default: all)")
-	fmt.Println("  -sizes <list>  Comma-separated cache sizes in K (default: 16,32,64,128,256)")
+	fmt.Println("  -html <file>     Output results to HTML file (default: temp dir)")
+	fmt.Println("  -caches <list>   Comma-separated caches to benchmark (default: all)")
+	fmt.Println("  -tests <list>    Comma-separated tests to run (default: all)")
+	fmt.Println("  -sizes <list>    Comma-separated cache sizes in K (default: 16,32,64,128,256)")
+	fmt.Println("  -threads <list>  Comma-separated thread counts for throughput (default: 1,8,16,32)")
 	fmt.Println()
 	fmt.Println("Available tests:")
 	fmt.Println("  Hit rate:    cdn, meta, zipf")
@@ -327,7 +345,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 }
 
 func runThroughputBenchmarks() *output.ThroughputData {
-	threads := benchmark.DefaultThreadCounts
+	threads := threadCounts
 
 	fmt.Println("-" + strings.Repeat("-", 79))
 	fmt.Println("THROUGHPUT BENCHMARKS (Multi-Threaded)")

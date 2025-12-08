@@ -17,13 +17,13 @@ type ThroughputResult struct {
 }
 
 // DefaultThreadCounts are the thread counts to benchmark.
-var DefaultThreadCounts = []int{1, 4, 8, 16, 32}
+var DefaultThreadCounts = []int{1, 8, 16, 32}
 
 const (
 	throughputCacheSize    = 10000
 	throughputWorkloadSize = 1_000_000
 	throughputAlpha        = 0.99
-	benchmarkDuration      = 2 * time.Second
+	benchmarkDuration      = 1 * time.Second
 	opsBatchSize           = 1000
 )
 

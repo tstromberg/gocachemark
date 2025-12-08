@@ -26,6 +26,13 @@ func (c *sfcacheCache) Close() {
 	c.c.Close()
 }
 
+func (c *sfcacheCache) GetOrSet(key, value string) string {
+	result, _ := c.c.GetSet(key, func() (string, error) {
+		return value, nil
+	})
+	return result
+}
+
 type sfcacheIntCache struct {
 	c *sfcache.MemoryCache[int, int]
 }
@@ -48,4 +55,11 @@ func (c *sfcacheIntCache) Name() string {
 
 func (c *sfcacheIntCache) Close() {
 	c.c.Close()
+}
+
+func (c *sfcacheIntCache) GetOrSet(key, value int) int {
+	result, _ := c.c.GetSet(key, func() (int, error) {
+		return value, nil
+	})
+	return result
 }

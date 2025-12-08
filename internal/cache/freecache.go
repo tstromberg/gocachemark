@@ -47,3 +47,8 @@ func (c *freecacheCache) Name() string {
 }
 
 func (c *freecacheCache) Close() {}
+
+func (c *freecacheCache) GetOrSet(key, value string) string {
+	result, _ := c.c.GetOrSet([]byte(key), []byte(value), 0)
+	return string(result)
+}

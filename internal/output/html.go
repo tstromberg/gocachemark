@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"runtime"
 	"sort"
 	"time"
 
@@ -19,6 +20,16 @@ type Results struct {
 	Throughput  *ThroughputData
 	Memory      *MemoryData
 	Rankings    []Ranking
+	MachineInfo MachineInfo
+}
+
+// MachineInfo holds information about the benchmark environment.
+type MachineInfo struct {
+	OS          string
+	Arch        string
+	NumCPU      int
+	GoVersion   string
+	CommandLine string
 }
 
 // Ranking represents an overall ranking entry.
@@ -53,9 +64,11 @@ type LatencyData struct {
 
 // ThroughputData holds throughput benchmark data.
 type ThroughputData struct {
-	Results    []benchmark.ThroughputResult
-	IntResults []benchmark.ThroughputResult
-	Threads    []int
+	Results          []benchmark.ThroughputResult
+	IntResults       []benchmark.ThroughputResult
+	GetOrSetResults  []benchmark.ThroughputResult
+	IntGetOrSetResults []benchmark.ThroughputResult
+	Threads          []int
 }
 
 func joinStrings(s []string, sep string) string {
@@ -70,8 +83,9 @@ func joinStrings(s []string, sep string) string {
 }
 
 // WriteHTML writes benchmark results to an HTML file with bar charts.
-func WriteHTML(filename string, results Results) error {
-	results.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+func WriteHTML(filename string, results Results, commandLine string) error {
+	results.Timestamp = time.Now().Format("2006-01-02 15:04:05 MST")
+	results.MachineInfo = GetMachineInfo(commandLine)
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -82,8 +96,26 @@ func WriteHTML(filename string, results Results) error {
 	return htmlTemplate.Execute(f, results)
 }
 
+// GetMachineInfo collects information about the benchmark environment.
+func GetMachineInfo(commandLine string) MachineInfo {
+	return MachineInfo{
+		OS:          runtime.GOOS,
+		Arch:        runtime.GOARCH,
+		NumCPU:      runtime.NumCPU(),
+		GoVersion:   runtime.Version(),
+		CommandLine: commandLine,
+	}
+}
+
 var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 	"add": func(a, b int) int { return a + b },
+	"mul": func(a, b float64) float64 { return a * b },
+	"div": func(a, b float64) float64 {
+		if b == 0 {
+			return 0
+		}
+		return a / b
+	},
 	"avgHitRate": func(r benchmark.HitRateResult, sizes []int) float64 {
 		var sum float64
 		for _, size := range sizes {
@@ -152,20 +184,38 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		return template.JS("[" + joinStrings(labels, ",") + "]")
 	},
 	"hitRateDatasets": func(results []benchmark.HitRateResult, sizes []int) template.JS {
-		colors := []string{
-			"#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#E91E63",
-			"#00BCD4", "#795548", "#607D8B", "#F44336", "#3F51B5",
-			"#8BC34A", "#CDDC39", "#FFC107", "#FF5722", "#009688",
+		cacheColors := map[string]string{
+			"sfcache":        "#2E7D32",
+			"otter":          "#1976D2",
+			"theine":         "#D32F2F",
+			"ristretto":      "#7B1FA2",
+			"freecache":      "#F57C00",
+			"freelru-shard":  "#0288D1",
+			"freelru-sync":   "#00796B",
+			"tinylfu":        "#C2185B",
+			"sieve":          "#5D4037",
+			"s3-fifo":        "#455A64",
+			"2q":             "#E64A19",
+			"s4lru":          "#512DA8",
+			"clock":          "#00695C",
+			"lru":            "#AFB42B",
+			"ttlcache":       "#0097A7",
+		}
+		fallbackColors := []string{
+			"#388E3C", "#1E88E5", "#E53935", "#8E24AA", "#FB8C00",
 		}
 		var datasets []string
 		for i, r := range results {
-			color := colors[i%len(colors)]
+			color, ok := cacheColors[r.Name]
+			if !ok {
+				color = fallbackColors[i%len(fallbackColors)]
+			}
 			var data []string
 			for _, size := range sizes {
 				data = append(data, fmt.Sprintf("%.2f", r.Rates[size]))
 			}
 			datasets = append(datasets, fmt.Sprintf(
-				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false}`,
+				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}`,
 				r.Name, joinStrings(data, ","), color, color,
 			))
 		}
@@ -179,20 +229,38 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		return template.JS("[" + joinStrings(labels, ",") + "]")
 	},
 	"throughputDatasets": func(results []benchmark.ThroughputResult, threads []int) template.JS {
-		colors := []string{
-			"#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#E91E63",
-			"#00BCD4", "#795548", "#607D8B", "#F44336", "#3F51B5",
-			"#8BC34A", "#CDDC39", "#FFC107", "#FF5722", "#009688",
+		cacheColors := map[string]string{
+			"sfcache":        "#2E7D32",
+			"otter":          "#1976D2",
+			"theine":         "#D32F2F",
+			"ristretto":      "#7B1FA2",
+			"freecache":      "#F57C00",
+			"freelru-shard":  "#0288D1",
+			"freelru-sync":   "#00796B",
+			"tinylfu":        "#C2185B",
+			"sieve":          "#5D4037",
+			"s3-fifo":        "#455A64",
+			"2q":             "#E64A19",
+			"s4lru":          "#512DA8",
+			"clock":          "#00695C",
+			"lru":            "#AFB42B",
+			"ttlcache":       "#0097A7",
+		}
+		fallbackColors := []string{
+			"#388E3C", "#1E88E5", "#E53935", "#8E24AA", "#FB8C00",
 		}
 		var datasets []string
 		for i, r := range results {
-			color := colors[i%len(colors)]
+			color, ok := cacheColors[r.Name]
+			if !ok {
+				color = fallbackColors[i%len(fallbackColors)]
+			}
 			var data []string
 			for _, t := range threads {
 				data = append(data, fmt.Sprintf("%.0f", r.QPS[t]))
 			}
 			datasets = append(datasets, fmt.Sprintf(
-				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false}`,
+				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}`,
 				r.Name, joinStrings(data, ","), color, color,
 			))
 		}
@@ -275,6 +343,57 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		}
 		return max
 	},
+	"maxIntSetEvictLatency": func(results []benchmark.IntLatencyResult) float64 {
+		max := 0.0
+		for _, r := range results {
+			if r.SetEvictNsOp > max {
+				max = r.SetEvictNsOp
+			}
+		}
+		return max
+	},
+	"maxGetOrSetLatency": func(results []benchmark.LatencyResult) float64 {
+		max := 0.0
+		for _, r := range results {
+			if r.HasGetOrSet && r.GetOrSetNsOp > max {
+				max = r.GetOrSetNsOp
+			}
+		}
+		return max
+	},
+	"maxIntGetOrSetLatency": func(results []benchmark.IntLatencyResult) float64 {
+		max := 0.0
+		for _, r := range results {
+			if r.HasGetOrSet && r.GetOrSetNsOp > max {
+				max = r.GetOrSetNsOp
+			}
+		}
+		return max
+	},
+	"filterGetOrSet": func(results []benchmark.LatencyResult) []benchmark.LatencyResult {
+		filtered := make([]benchmark.LatencyResult, 0)
+		for _, r := range results {
+			if r.HasGetOrSet {
+				filtered = append(filtered, r)
+			}
+		}
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].GetOrSetNsOp < filtered[j].GetOrSetNsOp
+		})
+		return filtered
+	},
+	"filterIntGetOrSet": func(results []benchmark.IntLatencyResult) []benchmark.IntLatencyResult {
+		filtered := make([]benchmark.IntLatencyResult, 0)
+		for _, r := range results {
+			if r.HasGetOrSet {
+				filtered = append(filtered, r)
+			}
+		}
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].GetOrSetNsOp < filtered[j].GetOrSetNsOp
+		})
+		return filtered
+	},
 	"maxQPS": func(results []benchmark.ThroughputResult, threads int) float64 {
 		max := 0.0
 		for _, r := range results {
@@ -293,188 +412,249 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		}
 		return float64(max)
 	},
+	"maxOverhead": func(results []benchmark.MemoryResult) float64 {
+		max := int64(0)
+		for _, r := range results {
+			if r.BytesPerItem > max {
+				max = r.BytesPerItem
+			}
+		}
+		return float64(max)
+	},
 	"mb": func(b uint64) string {
 		return fmt.Sprintf("%.2f", float64(b)/1024/1024)
 	},
 	"toFloat": func(b uint64) float64 {
 		return float64(b)
 	},
+	"toFloatInt": func(b int64) float64 {
+		return float64(b)
+	},
 }).Parse(`<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Go Cache Benchmark Results</title>
+    <title>gocachemark - Go Cache Benchmark Results</title>
     <style>
         * { box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
+            padding: 40px 20px;
+            background: white;
             line-height: 1.6;
+            color: #333;
+        }
+        @media print {
+            body { padding: 20px; }
+            .podium-container { page-break-inside: avoid; }
+            .chart-container { page-break-inside: avoid; }
         }
         h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #4CAF50;
-            padding-bottom: 15px;
+            color: #000;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
             margin-bottom: 10px;
-            font-size: 2.5em;
+            font-size: 2em;
+            font-weight: 600;
         }
         h2 {
-            color: #34495e;
+            color: #000;
             margin-top: 50px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #3498db;
-            font-size: 1.8em;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            font-size: 1.5em;
+            font-weight: 600;
         }
         h3 {
-            color: #555;
-            margin-top: 35px;
-            font-size: 1.3em;
+            color: #333;
+            margin-top: 30px;
+            font-size: 1.2em;
+            font-weight: 600;
         }
         h4 {
-            color: #666;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            font-size: 1.1em;
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
         }
-        .timestamp { color: #7f8c8d; font-size: 0.95em; margin-bottom: 30px; }
+        .timestamp {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 20px;
+        }
+        .timestamp a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .timestamp a:hover {
+            text-decoration: underline;
+        }
+        .benchmark-info-top {
+            padding: 15px;
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            font-size: 0.9em;
+        }
+        .benchmark-info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, auto);
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+        .benchmark-info-top .info-item {
+            display: flex;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .benchmark-info-command {
+            display: flex;
+            gap: 8px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        .benchmark-info-top .info-label {
+            font-weight: 600;
+            color: #000;
+        }
+        .benchmark-info-top .info-value {
+            color: #555;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .benchmark-info-command .info-value {
+            overflow-x: auto;
+            white-space: nowrap;
+        }
         .podium-container {
             display: flex;
             justify-content: center;
             align-items: flex-end;
             gap: 20px;
-            margin: 40px 0 60px 0;
+            margin: 40px 0;
             padding: 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: 1px solid #ddd;
+            height: 280px;
         }
         .podium-item {
             text-align: center;
-            background: white;
-            border-radius: 12px;
-            padding: 25px 30px;
-            min-width: 200px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-        .podium-item:hover {
-            transform: translateY(-5px);
+            border: 2px solid #000;
+            padding: 20px 30px;
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
         }
         .podium-item.first {
             order: 2;
-            padding: 35px 40px;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-            color: #333;
+            background: #FFD700;
+            border-color: #DAA520;
+            border-width: 3px;
         }
         .podium-item.second {
             order: 1;
-            padding: 25px 30px;
-            background: linear-gradient(135deg, #C0C0C0 0%, #A8A8A8 100%);
-            color: #333;
+            background: #C0C0C0;
+            border-color: #A8A8A8;
         }
         .podium-item.third {
             order: 3;
-            padding: 20px 25px;
-            background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%);
+            background: #CD7F32;
+            border-color: #B87333;
             color: white;
         }
         .medal {
-            font-size: 4em;
+            font-size: 2.5em;
             margin-bottom: 10px;
             display: block;
-            animation: float 3s ease-in-out infinite;
         }
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+        .rank {
+            font-size: 0.9em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .rank { font-size: 1.1em; font-weight: 600; opacity: 0.9; }
-        .cache-name { font-size: 1.8em; font-weight: bold; margin: 10px 0; }
-        .score { font-size: 1.1em; opacity: 0.95; font-weight: 500; }
+        .cache-name {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin: 10px 0;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .score {
+            font-size: 1em;
+            font-weight: 500;
+            color: #666;
+        }
         .section-header {
-            background: white;
-            padding: 20px 30px;
-            border-radius: 10px;
-            margin: 30px 0 20px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 15px 0;
+            margin: 40px 0 20px 0;
+            border-bottom: 1px solid #ddd;
         }
         .section-header h2 {
             margin: 0;
             border: none;
         }
+        .section-header p {
+            margin: 5px 0 0 0;
+            color: #666;
+            font-size: 0.9em;
+        }
         .toc {
-            background: white;
-            border-radius: 10px;
-            padding: 25px 30px;
+            padding: 20px 0;
             margin: 30px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
         }
         .toc h2 {
-            margin: 0 0 20px 0;
-            color: #2c3e50;
+            margin: 0 0 15px 0;
+            color: #000;
             border: none;
-            font-size: 1.5em;
+            font-size: 1.2em;
         }
         .toc ul {
-            list-style: none;
-            padding: 0;
+            list-style: disc;
+            padding-left: 20px;
             margin: 0;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
         }
         .toc li {
-            margin: 0;
+            margin: 8px 0;
         }
         .toc a {
-            display: flex;
-            align-items: center;
-            padding: 12px 15px;
-            background: #f8f9fa;
-            border-radius: 6px;
             text-decoration: none;
-            color: #333;
-            transition: all 0.2s;
-            border-left: 4px solid transparent;
+            color: #0066cc;
         }
         .toc a:hover {
-            background: #e9ecef;
-            border-left-color: #4CAF50;
-            transform: translateX(5px);
+            text-decoration: underline;
         }
         .toc a .icon {
-            font-size: 1.5em;
-            margin-right: 12px;
+            margin-right: 8px;
         }
         .collapsible-section {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+            border: 1px solid #ddd;
             margin: 30px 0;
-            overflow: hidden;
             background: white;
         }
         .section-toggle {
             cursor: pointer;
-            padding: 20px 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 15px 20px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            color: #000;
             display: flex;
             align-items: center;
             justify-content: space-between;
             user-select: none;
-            transition: background 0.3s;
         }
         .section-toggle:hover {
-            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+            background: #eee;
         }
         .section-toggle h2 {
             margin: 0;
-            color: white;
+            color: #000;
             border: none;
-            font-size: 1.8em;
+            font-size: 1.5em;
+            font-weight: 600;
         }
         .section-toggle .toggle-icon {
             font-size: 1.5em;
@@ -495,75 +675,94 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         }
         .suite-description {
             margin: 0 0 20px 0;
-            padding: 15px 20px;
-            background: #f8f9fa;
-            border-left: 4px solid #4CAF50;
-            border-radius: 4px;
+            padding: 10px 0 10px 15px;
+            border-left: 3px solid #666;
             color: #555;
         }
         .chart-container {
-            background: white;
-            border-radius: 8px;
             padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 30px 0;
+            border: 1px solid #ddd;
+        }
+        footer {
+            margin-top: 60px;
+            padding: 20px 0;
+            border-top: 1px solid #ddd;
+            color: #999;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        footer a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
         }
         .bar-row {
             display: flex;
             align-items: center;
-            margin: 8px 0;
-            height: 28px;
+            margin: 6px 0;
+            height: 24px;
         }
         .bar-label {
             width: 120px;
             font-size: 13px;
             font-weight: 500;
-            color: #333;
+            color: #000;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
         }
         .bar-container {
             flex: 1;
-            height: 22px;
-            background: #e0e0e0;
-            border-radius: 4px;
+            height: 18px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
             overflow: hidden;
         }
         .bar {
             height: 100%;
-            background: linear-gradient(90deg, #4CAF50, #8BC34A);
-            border-radius: 4px;
-            transition: width 0.3s ease;
+            background: #2E7D32;
         }
         .bar-value {
-            width: 80px;
+            width: 90px;
             text-align: right;
             font-size: 13px;
             font-weight: 500;
-            color: #555;
+            color: #333;
             padding-left: 10px;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
         }
-        .bar.latency { background: linear-gradient(90deg, #2196F3, #03A9F4); }
-        .bar.memory { background: linear-gradient(90deg, #9C27B0, #E91E63); }
-        .bar.throughput { background: linear-gradient(90deg, #FF9800, #FFC107); }
+        .bar.latency { background: #2E7D32; }
+        .bar.memory { background: #2E7D32; }
+        .bar.throughput { background: #2E7D32; }
         table {
             width: 100%;
             border-collapse: collapse;
             background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            margin: 20px 0;
         }
         th, td {
-            padding: 12px 15px;
+            padding: 8px 12px;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #ddd;
         }
         th {
-            background: #4CAF50;
-            color: white;
+            background: #f5f5f5;
+            color: #000;
+            font-weight: 600;
+            border-bottom: 2px solid #000;
+        }
+        td {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        td:first-child {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-weight: 500;
         }
-        tr:hover { background: #f9f9f9; }
-        .best { font-weight: bold; color: #4CAF50; }
+        tr:hover { background: #fafafa; }
+        .best { font-weight: bold; }
         th.sortable {
             cursor: pointer;
             user-select: none;
@@ -571,14 +770,14 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             padding-right: 25px;
         }
         th.sortable:hover {
-            background: #45a049;
+            background: #e5e5e5;
         }
         th.sortable::after {
             content: '▼';
             position: absolute;
             right: 8px;
             opacity: 0.3;
-            font-size: 0.8em;
+            font-size: 0.7em;
         }
         th.sortable.sorted-asc::after {
             content: '▲';
@@ -594,31 +793,52 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             gap: 8px;
         }
         .cell-bar {
-            height: 14px;
-            background: linear-gradient(90deg, #2196F3, #03A9F4);
-            border-radius: 3px;
+            height: 12px;
+            background: #2E7D32;
             min-width: 2px;
         }
-        .cell-bar.set { background: linear-gradient(90deg, #4CAF50, #8BC34A); }
-        .cell-bar.evict { background: linear-gradient(90deg, #FF9800, #FFC107); }
+        .cell-bar.set { background: #388E3C; }
+        .cell-bar.evict { background: #43A047; }
         .cell-value {
             white-space: nowrap;
             min-width: 50px;
         }
         .line-chart-container {
-            background: white;
-            border-radius: 8px;
             padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 30px 0;
+            border: 1px solid #ddd;
             height: 400px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>🚀 Go Cache Benchmark Results</h1>
-    <p class="timestamp">Generated: {{.Timestamp}}</p>
+    <h1>gocachemark</h1>
+    <p class="timestamp">
+        Benchmark report for Go cache implementations.
+        <a href="https://github.com/tstromberg/gocachemark" target="_blank">View on GitHub →</a>
+    </p>
+
+    <div class="benchmark-info-top">
+        <div class="benchmark-info-grid">
+            <div class="info-item">
+                <span class="info-label">Generated:</span>
+                <span class="info-value">{{.Timestamp}}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Machine:</span>
+                <span class="info-value">{{.MachineInfo.OS}}/{{.MachineInfo.Arch}} ({{.MachineInfo.NumCPU}} CPUs)</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Go Version:</span>
+                <span class="info-value">{{.MachineInfo.GoVersion}}</span>
+            </div>
+        </div>
+        <div class="benchmark-info-command info-item">
+            <span class="info-label">Command:</span>
+            <span class="info-value">{{.MachineInfo.CommandLine}}</span>
+        </div>
+    </div>
 
 {{if .Rankings}}
     <div class="section-header">
@@ -627,9 +847,15 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     </div>
 
     <div class="podium-container">
+        {{$first := index .Rankings 0}}
+        {{$maxScore := $first.Score}}
         {{range $i, $r := .Rankings}}
         {{if lt $i 3}}
-        <div class="podium-item {{if eq $i 0}}first{{else if eq $i 1}}second{{else}}third{{end}}">
+        {{$heightPx := 200}}
+        {{if ne $maxScore 0.0}}
+            {{$heightPx = printf "%.0f" (mul (div $r.Score $maxScore) 200.0)}}
+        {{end}}
+        <div class="podium-item {{if eq $i 0}}first{{else if eq $i 1}}second{{else}}third{{end}}" style="height: {{$heightPx}}px;">
             <span class="medal">{{if eq $i 0}}🥇{{else if eq $i 1}}🥈{{else}}🥉{{end}}</span>
             <div class="rank">{{if eq $i 0}}1st Place{{else if eq $i 1}}2nd Place{{else}}3rd Place{{end}}</div>
             <div class="cache-name">{{$r.Name}}</div>
@@ -816,54 +1042,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     <h3>String Keys</h3>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 20px 0;">
-        <div>
-            <h4 style="text-align: center; color: #2196F3; margin-top: 0;">Get Latency (ns/op)</h4>
-            <div class="chart-container" style="padding: 15px;">
-                {{range $sortedResults}}
-                <div class="bar-row">
-                    <span class="bar-label">{{.Name}}</span>
-                    <div class="bar-container">
-                        <div class="bar latency" style="width: {{barWidth .GetNsOp $maxGet}}%"></div>
-                    </div>
-                    <span class="bar-value">{{ns .GetNsOp}}</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-
-        <div>
-            <h4 style="text-align: center; color: #4CAF50; margin-top: 0;">Set Latency (ns/op)</h4>
-            <div class="chart-container" style="padding: 15px;">
-                {{range $sortedResults}}
-                <div class="bar-row">
-                    <span class="bar-label">{{.Name}}</span>
-                    <div class="bar-container">
-                        <div class="bar set" style="width: {{barWidth .SetNsOp $maxSet}}%"></div>
-                    </div>
-                    <span class="bar-value">{{ns .SetNsOp}}</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-
-        <div>
-            <h4 style="text-align: center; color: #FF9800; margin-top: 0;">SetEvict Latency (ns/op)</h4>
-            <div class="chart-container" style="padding: 15px;">
-                {{range $sortedResults}}
-                <div class="bar-row">
-                    <span class="bar-label">{{.Name}}</span>
-                    <div class="bar-container">
-                        <div class="bar evict" style="width: {{barWidth .SetEvictNsOp $maxEvict}}%"></div>
-                    </div>
-                    <span class="bar-value">{{ns .SetEvictNsOp}}</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-    </div>
-
-    <h4>Full Results Table</h4>
+    <h4>Results</h4>
     <table>
         <thead>
         <tr>
@@ -897,42 +1076,11 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     {{$sortedIntResults := sortByIntGetLatency .Latency.IntResults}}
     {{$maxIntGet := maxIntLatency $sortedIntResults}}
     {{$maxIntSet := maxIntSetLatency $sortedIntResults}}
+    {{$maxIntEvict := maxIntSetEvictLatency $sortedIntResults}}
 
     <h3 style="margin-top: 40px;">Int Keys</h3>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-        <div>
-            <h4 style="text-align: center; color: #2196F3; margin-top: 0;">Get Latency (ns/op)</h4>
-            <div class="chart-container" style="padding: 15px;">
-                {{range $sortedIntResults}}
-                <div class="bar-row">
-                    <span class="bar-label">{{.Name}}</span>
-                    <div class="bar-container">
-                        <div class="bar latency" style="width: {{barWidth .GetNsOp $maxIntGet}}%"></div>
-                    </div>
-                    <span class="bar-value">{{ns .GetNsOp}}</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-
-        <div>
-            <h4 style="text-align: center; color: #4CAF50; margin-top: 0;">Set Latency (ns/op)</h4>
-            <div class="chart-container" style="padding: 15px;">
-                {{range $sortedIntResults}}
-                <div class="bar-row">
-                    <span class="bar-label">{{.Name}}</span>
-                    <div class="bar-container">
-                        <div class="bar set" style="width: {{barWidth .SetNsOp $maxIntSet}}%"></div>
-                    </div>
-                    <span class="bar-value">{{ns .SetNsOp}}</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-    </div>
-
-    <h4>Full Results Table</h4>
+    <h4>Results</h4>
     <table>
         <thead>
         <tr>
@@ -941,6 +1089,8 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             <th class="sortable">Get allocs</th>
             <th class="sortable">Set (ns)</th>
             <th class="sortable">Set allocs</th>
+            <th class="sortable">SetEvict (ns)</th>
+            <th class="sortable">SetEvict allocs</th>
             <th class="sortable">Avg (ns)</th>
         </tr>
         </thead>
@@ -952,12 +1102,71 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             <td>{{.GetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxIntSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
             <td>{{.SetAllocs}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxIntEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
+            <td>{{.SetEvictAllocs}}</td>
             <td style="font-weight:bold;">{{ns (avgIntLatency .)}}</td>
         </tr>
         {{end}}
         </tbody>
     </table>
     {{end}}
+
+    {{$getOrSetResults := filterGetOrSet .Latency.Results}}
+    {{if $getOrSetResults}}
+    {{$maxGetOrSet := maxGetOrSetLatency .Latency.Results}}
+    <h3 style="margin-top: 40px;">String Keys - GetOrSet</h3>
+    <p class="suite-description">GetOrSet is an atomic operation that gets a value if it exists, or sets it if it doesn't. Only caches that support this operation are shown.</p>
+
+    <h4>GetOrSet Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">GetOrSet (ns)</th>
+            <th class="sortable">GetOrSet allocs</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $getOrSetResults}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetOrSetNsOp $maxGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .GetOrSetNsOp}}</span></div></td>
+            <td>{{.GetOrSetAllocs}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Latency.IntResults}}
+    {{$intGetOrSetResults := filterIntGetOrSet .Latency.IntResults}}
+    {{if $intGetOrSetResults}}
+    {{$maxIntGetOrSet := maxIntGetOrSetLatency .Latency.IntResults}}
+    <h3 style="margin-top: 40px;">Int Keys - GetOrSet</h3>
+    <p class="suite-description">GetOrSet latency for integer keys. Only caches that support this operation are shown.</p>
+
+    <h4>GetOrSet Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">GetOrSet (ns)</th>
+            <th class="sortable">GetOrSet allocs</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $intGetOrSetResults}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetOrSetNsOp $maxIntGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .GetOrSetNsOp}}</span></div></td>
+            <td>{{.GetOrSetAllocs}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+    {{end}}
+
     </div>
 </div>
 {{end}}
@@ -1040,22 +1249,9 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     <div class="section-content">
         <p class="suite-description">Capacity: {{.Memory.Capacity}} items, Value size: {{.Memory.ValSize}} bytes. Measured in isolated processes. Overhead compared to baseline <code>map[string][]byte</code>. Lower is better.</p>
 
-    <h3>Memory Usage (MB)</h3>
-    <div class="chart-container">
-        {{$results := .Memory.Results}}
-        {{$max := maxMemory $results}}
-        {{range $results}}
-        <div class="bar-row">
-            <span class="bar-label">{{.Name}}</span>
-            <div class="bar-container">
-                <div class="bar memory" style="width: {{barWidth (toFloat .Bytes) $max}}%"></div>
-            </div>
-            <span class="bar-value">{{mb .Bytes}} MB</span>
-        </div>
-        {{end}}
-    </div>
-
-    <h3>Full Memory Table</h3>
+    {{$results := .Memory.Results}}
+    {{$maxOverhead := maxOverhead $results}}
+    <h3>Memory Results</h3>
     <table>
         <thead>
         <tr>
@@ -1066,12 +1262,12 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         </tr>
         </thead>
         <tbody>
-        {{range .Memory.Results}}
+        {{range $results}}
         <tr>
             <td>{{.Name}}</td>
             <td>{{.Items}}</td>
             <td>{{mb .Bytes}}</td>
-            <td>{{.BytesPerItem}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth (toFloatInt .BytesPerItem) $maxOverhead}}px"></div><span class="cell-value">{{.BytesPerItem}}</span></div></td>
         </tr>
         {{end}}
         </tbody>
@@ -1081,9 +1277,30 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{end}}
 
 <script>
-function createLineChart(canvasId, labels, datasets, yLabel) {
+function createLineChart(canvasId, labels, datasets, yLabel, useLogY = false) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
+
+    const yAxisConfig = {
+        title: { display: true, text: yLabel },
+        beginAtZero: false
+    };
+
+    if (useLogY) {
+        yAxisConfig.type = 'logarithmic';
+        yAxisConfig.min = 1;
+        yAxisConfig.ticks = {
+            callback: function(value, index, ticks) {
+                // Only show major gridlines (powers of 10 and their midpoints)
+                if (value === 1 || value === 10 || value === 100 ||
+                    value === 5 || value === 50) {
+                    return value;
+                }
+                return null;
+            }
+        };
+    }
+
     new Chart(ctx, {
         type: 'line',
         data: { labels: labels, datasets: datasets },
@@ -1094,10 +1311,7 @@ function createLineChart(canvasId, labels, datasets, yLabel) {
                 legend: { position: 'right' }
             },
             scales: {
-                y: {
-                    title: { display: true, text: yLabel },
-                    beginAtZero: false
-                },
+                y: yAxisConfig,
                 x: {
                     title: { display: true, text: 'Cache Size' }
                 }
@@ -1196,19 +1410,19 @@ function toggleSection(toggleElement) {
 {{if .HitRate}}
 {{$sizes := .HitRate.Sizes}}
 {{if .HitRate.CDN}}
-createLineChart('cdnChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.CDN $sizes}}, 'Hit Rate (%)');
+createLineChart('cdnChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.CDN $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{if .HitRate.Meta}}
-createLineChart('metaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Meta $sizes}}, 'Hit Rate (%)');
+createLineChart('metaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Meta $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{if .HitRate.Zipf}}
-createLineChart('zipfChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Zipf $sizes}}, 'Hit Rate (%)');
+createLineChart('zipfChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Zipf $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{if .HitRate.Twitter}}
-createLineChart('twitterChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Twitter $sizes}}, 'Hit Rate (%)');
+createLineChart('twitterChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Twitter $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{if .HitRate.Wikipedia}}
-createLineChart('wikipediaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Wikipedia $sizes}}, 'Hit Rate (%)');
+createLineChart('wikipediaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Wikipedia $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{end}}
 
@@ -1222,6 +1436,11 @@ createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDat
 {{end}}
 {{end}}
 </script>
+
+<footer>
+    Generated by <a href="https://github.com/tstromberg/gocachemark" target="_blank">gocachemark</a>
+</footer>
+
 </body>
 </html>
 `))

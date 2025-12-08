@@ -1,6 +1,34 @@
 package cache
 
-import "github.com/maypok86/otter/v2"
+import (
+	"context"
+
+	"github.com/maypok86/otter/v2"
+)
+
+type stringLoader struct {
+	value string
+}
+
+func (l *stringLoader) Load(_ context.Context, _ string) (string, error) {
+	return l.value, nil
+}
+
+func (l *stringLoader) Reload(_ context.Context, _ string, _ string) (string, error) {
+	return l.value, nil
+}
+
+type intLoader struct {
+	value int
+}
+
+func (l *intLoader) Load(_ context.Context, _ int) (int, error) {
+	return l.value, nil
+}
+
+func (l *intLoader) Reload(_ context.Context, _ int, _ int) (int, error) {
+	return l.value, nil
+}
 
 type otterCache struct {
 	c *otter.Cache[string, string]
@@ -25,6 +53,11 @@ func (c *otterCache) Name() string {
 
 func (c *otterCache) Close() {}
 
+func (c *otterCache) GetOrSet(key, value string) string {
+	result, _ := c.c.Get(context.Background(), key, &stringLoader{value: value})
+	return result
+}
+
 type otterIntCache struct {
 	c *otter.Cache[int, int]
 }
@@ -47,3 +80,8 @@ func (c *otterIntCache) Name() string {
 }
 
 func (c *otterIntCache) Close() {}
+
+func (c *otterIntCache) GetOrSet(key, value int) int {
+	result, _ := c.c.Get(context.Background(), key, &intLoader{value: value})
+	return result
+}

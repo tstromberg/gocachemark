@@ -19,6 +19,7 @@ import (
 	"github.com/dgryski/go-s4lru"
 	"github.com/elastic/go-freelru"
 	lru2 "github.com/hashicorp/golang-lru/v2"
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/maypok86/otter/v2"
 	"github.com/scalalang2/golang-fifo/s3fifo"
 	"github.com/scalalang2/golang-fifo/sieve"
@@ -87,6 +88,8 @@ func runBenchmark(name string, capacity, valSize int) int {
 		return runClock(capacity, valSize)
 	case "lru":
 		return runLRU(capacity, valSize)
+	case "ttlcache":
+		return runTTLCache(capacity, valSize)
 	default:
 		return 0
 	}
@@ -281,6 +284,22 @@ func runLRU(capacity, valSize int) int {
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
+	}
+	keepAlive = c
+	return c.Len()
+}
+
+func runTTLCache(capacity, valSize int) int {
+	c := ttlcache.New[string, []byte](
+		ttlcache.WithCapacity[string, []byte](uint64(capacity)),
+		ttlcache.WithTTL[string, []byte](time.Hour),
+	)
+	go c.Start()
+	defer c.Stop()
+
+	for i := range capacity {
+		key := "key-" + strconv.Itoa(i)
+		c.Set(key, make([]byte, valSize), ttlcache.DefaultTTL)
 	}
 	keepAlive = c
 	return c.Len()

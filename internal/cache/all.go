@@ -5,6 +5,7 @@ var registry = map[string]Factory{
 	"sfcache":       NewSFCache,
 	"otter":         NewOtter,
 	"theine":        NewTheine,
+	"ttlcache":      NewTTLCache,
 	"ristretto":     NewRistretto,
 	"tinylfu":       NewTinyLFU,
 	"sieve":         NewSieve,
@@ -29,18 +30,19 @@ var intRegistry = map[string]IntFactory{
 	"sfcache":       NewSFCacheInt,
 	"otter":         NewOtterInt,
 	"theine":        NewTheineInt,
+	"ttlcache":      NewTTLCacheInt,
 	"freelru-shard": NewFreeLRUShardedInt,
 }
 
 // defaultOrder defines the display order for caches.
 var defaultOrder = []string{
-	"sfcache", "otter", "theine", "ristretto", "tinylfu", "sieve", "s3-fifo",
+	"sfcache", "otter", "theine", "ttlcache", "ristretto", "tinylfu", "sieve", "s3-fifo",
 	"freelru-shard", "freelru-sync", "freecache", "2q", "s4lru", "clock", "lru",
 }
 
 // intOrder defines the display order for int-keyed caches.
 var intOrder = []string{
-	"sfcache", "otter", "theine", "freelru-shard",
+	"sfcache", "otter", "theine", "ttlcache", "freelru-shard",
 }
 
 // Filter holds the current cache filter (nil = all caches).

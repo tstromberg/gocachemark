@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -31,6 +33,7 @@ func main() {
 	memory := flag.Bool("memory", false, "Run memory overhead benchmarks (isolated processes)")
 	all := flag.Bool("all", false, "Run all benchmarks")
 	htmlOut := flag.String("html", "", "Output results to HTML file (e.g., results.html)")
+	openHTML := flag.Bool("open", false, "Open HTML report in web browser after generation")
 	caches := flag.String("caches", "", "Comma-separated list of caches to benchmark (default: all)")
 	tests := flag.String("tests", "", "Comma-separated list of hit rate tests: cdn,meta,zipf (default: all)")
 	sizes := flag.String("sizes", "", "Comma-separated cache sizes in K (e.g., 16,32,64,128,256)")
@@ -112,11 +115,21 @@ func main() {
 	if htmlPath == "" {
 		htmlPath = filepath.Join(os.TempDir(), "gocachemark-results.html")
 	}
-	if err := output.WriteHTML(htmlPath, results); err != nil {
+
+	// Build command line string
+	commandLine := "gocachemark " + strings.Join(os.Args[1:], " ")
+
+	if err := output.WriteHTML(htmlPath, results, commandLine); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing HTML: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("Results: %s\n", htmlPath)
+
+	if *openHTML {
+		if err := openBrowser(htmlPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not open browser: %v\n", err)
+		}
+	}
 }
 
 func printUsage() {
@@ -139,7 +152,7 @@ func printUsage() {
 	fmt.Println("Available tests:")
 	fmt.Println("  Hit rate:    cdn, meta, zipf, twitter, wikipedia")
 	fmt.Println("  Latency:     string, int")
-	fmt.Println("  Throughput:  string-throughput, int-throughput")
+	fmt.Println("  Throughput:  string-throughput, int-throughput, getorset-throughput, int-getorset-throughput")
 	fmt.Println("  Memory:      memory")
 	fmt.Println()
 	fmt.Println("Examples:")
@@ -332,6 +345,41 @@ func runLatencyBenchmarks() *output.LatencyData {
 			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
 			fmt.Printf("Best: %s (%.0f ns avg, %.1f%% faster than %s)\n\n", best.Name, avgLatency(best), pct, second.Name)
 		}
+
+		// GetOrSet latency (separate table)
+		getOrSetResults := make([]benchmark.LatencyResult, 0)
+		for _, r := range results {
+			if r.HasGetOrSet {
+				getOrSetResults = append(getOrSetResults, r)
+			}
+		}
+
+		if len(getOrSetResults) > 0 {
+			fmt.Println("### [string-getorset] String Keys - GetOrSet")
+			fmt.Println()
+
+			getOrSetSorted := make([]benchmark.LatencyResult, len(getOrSetResults))
+			copy(getOrSetSorted, getOrSetResults)
+			sort.Slice(getOrSetSorted, func(i, j int) bool {
+				return getOrSetSorted[i].GetOrSetNsOp < getOrSetSorted[j].GetOrSetNsOp
+			})
+
+			fmt.Println("| Cache         | GetOrSet ns | GetOrSet alloc | Avg ns |")
+			fmt.Println("|---------------|-------------|----------------|--------|")
+
+			for _, r := range getOrSetSorted {
+				fmt.Printf("| %-13s | %11.0f | %14d | %6.0f |\n",
+					r.Name, r.GetOrSetNsOp, r.GetOrSetAllocs, r.GetOrSetNsOp)
+			}
+			fmt.Println()
+
+			if len(getOrSetSorted) >= 2 {
+				best := getOrSetSorted[0]
+				second := getOrSetSorted[1]
+				pct := (second.GetOrSetNsOp - best.GetOrSetNsOp) / best.GetOrSetNsOp * 100
+				fmt.Printf("Best: %s (%.0f ns, %.1f%% faster than %s)\n\n", best.Name, best.GetOrSetNsOp, pct, second.Name)
+			}
+		}
 	}
 
 	// Int key benchmarks
@@ -365,6 +413,41 @@ func runLatencyBenchmarks() *output.LatencyData {
 			second := intSorted[1]
 			pct := (avgIntLatency(second) - avgIntLatency(best)) / avgIntLatency(best) * 100
 			fmt.Printf("Best: %s (%.0f ns avg, %.1f%% faster than %s)\n\n", best.Name, avgIntLatency(best), pct, second.Name)
+		}
+
+		// GetOrSet latency (separate table)
+		intGetOrSetResults := make([]benchmark.IntLatencyResult, 0)
+		for _, r := range intResults {
+			if r.HasGetOrSet {
+				intGetOrSetResults = append(intGetOrSetResults, r)
+			}
+		}
+
+		if len(intGetOrSetResults) > 0 {
+			fmt.Println("### [int-getorset] Int Keys - GetOrSet")
+			fmt.Println()
+
+			intGetOrSetSorted := make([]benchmark.IntLatencyResult, len(intGetOrSetResults))
+			copy(intGetOrSetSorted, intGetOrSetResults)
+			sort.Slice(intGetOrSetSorted, func(i, j int) bool {
+				return intGetOrSetSorted[i].GetOrSetNsOp < intGetOrSetSorted[j].GetOrSetNsOp
+			})
+
+			fmt.Println("| Cache         | GetOrSet ns | GetOrSet alloc | Avg ns |")
+			fmt.Println("|---------------|-------------|----------------|--------|")
+
+			for _, r := range intGetOrSetSorted {
+				fmt.Printf("| %-13s | %11.0f | %14d | %6.0f |\n",
+					r.Name, r.GetOrSetNsOp, r.GetOrSetAllocs, r.GetOrSetNsOp)
+			}
+			fmt.Println()
+
+			if len(intGetOrSetSorted) >= 2 {
+				best := intGetOrSetSorted[0]
+				second := intGetOrSetSorted[1]
+				pct := (second.GetOrSetNsOp - best.GetOrSetNsOp) / best.GetOrSetNsOp * 100
+				fmt.Printf("Best: %s (%.0f ns, %.1f%% faster than %s)\n\n", best.Name, best.GetOrSetNsOp, pct, second.Name)
+			}
 		}
 	}
 
@@ -451,6 +534,30 @@ func runThroughputBenchmarks() *output.ThroughputData {
 		fmt.Println()
 		data.IntResults = benchmark.RunIntThroughput(threads)
 		printThroughputTable(data.IntResults)
+	}
+
+	// GetOrSet throughput
+	if shouldRunTest("getorset-throughput") {
+		fmt.Println("### [getorset-throughput] String keys, Zipf workload, GetOrSet operations")
+		fmt.Println()
+		data.GetOrSetResults = benchmark.RunGetOrSetThroughput(threads)
+		if len(data.GetOrSetResults) > 0 {
+			printThroughputTable(data.GetOrSetResults)
+		} else {
+			fmt.Println("No caches with GetOrSet support found.\n")
+		}
+	}
+
+	// Int GetOrSet throughput
+	if shouldRunTest("int-getorset-throughput") {
+		fmt.Println("### [int-getorset-throughput] Int keys, Zipf workload, GetOrSet operations")
+		fmt.Println()
+		data.IntGetOrSetResults = benchmark.RunIntGetOrSetThroughput(threads)
+		if len(data.IntGetOrSetResults) > 0 {
+			printThroughputTable(data.IntGetOrSetResults)
+		} else {
+			fmt.Println("No caches with GetOrSet support found.\n")
+		}
 	}
 
 	return data
@@ -607,6 +714,43 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 			}
 			assignPoints(names)
 		}
+		// GetOrSet latency rankings
+		if results.Latency.Results != nil && len(results.Latency.Results) > 0 {
+			getOrSetResults := make([]benchmark.LatencyResult, 0)
+			for _, r := range results.Latency.Results {
+				if r.HasGetOrSet {
+					getOrSetResults = append(getOrSetResults, r)
+				}
+			}
+			if len(getOrSetResults) > 0 {
+				sort.Slice(getOrSetResults, func(i, j int) bool {
+					return getOrSetResults[i].GetOrSetNsOp < getOrSetResults[j].GetOrSetNsOp
+				})
+				var names []string
+				for _, r := range getOrSetResults {
+					names = append(names, r.Name)
+				}
+				assignPoints(names)
+			}
+		}
+		if results.Latency.IntResults != nil && len(results.Latency.IntResults) > 0 {
+			intGetOrSetResults := make([]benchmark.IntLatencyResult, 0)
+			for _, r := range results.Latency.IntResults {
+				if r.HasGetOrSet {
+					intGetOrSetResults = append(intGetOrSetResults, r)
+				}
+			}
+			if len(intGetOrSetResults) > 0 {
+				sort.Slice(intGetOrSetResults, func(i, j int) bool {
+					return intGetOrSetResults[i].GetOrSetNsOp < intGetOrSetResults[j].GetOrSetNsOp
+				})
+				var names []string
+				for _, r := range intGetOrSetResults {
+					names = append(names, r.Name)
+				}
+				assignPoints(names)
+			}
+		}
 	}
 
 	// Throughput benchmarks - rank by average QPS (higher is better)
@@ -634,6 +778,30 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 		if results.Throughput.IntResults != nil && len(results.Throughput.IntResults) > 0 {
 			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.IntResults))
 			copy(sorted, results.Throughput.IntResults)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgQPS(sorted[i]) > avgQPS(sorted[j])
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.Throughput.GetOrSetResults != nil && len(results.Throughput.GetOrSetResults) > 0 {
+			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.GetOrSetResults))
+			copy(sorted, results.Throughput.GetOrSetResults)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgQPS(sorted[i]) > avgQPS(sorted[j])
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.Throughput.IntGetOrSetResults != nil && len(results.Throughput.IntGetOrSetResults) > 0 {
+			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.IntGetOrSetResults))
+			copy(sorted, results.Throughput.IntGetOrSetResults)
 			sort.Slice(sorted, func(i, j int) bool {
 				return avgQPS(sorted[i]) > avgQPS(sorted[j])
 			})
@@ -702,4 +870,20 @@ func printOverallRanking(rankings []output.Ranking) {
 		fmt.Printf("%s #%d: %s (%.0f points)\n", medal, r.Rank, r.Name, r.Score)
 	}
 	fmt.Println()
+}
+
+// openBrowser opens the specified path in the default web browser.
+func openBrowser(path string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", path)
+	case "linux":
+		cmd = exec.Command("xdg-open", path)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", path)
+	default:
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+	return cmd.Start()
 }

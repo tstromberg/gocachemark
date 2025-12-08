@@ -26,3 +26,15 @@ type IntCache interface {
 
 // IntFactory creates a new int-keyed cache instance with the given capacity.
 type IntFactory func(capacity int) IntCache
+
+// GetOrSetCache is an optional interface for caches that support atomic GetOrSet.
+type GetOrSetCache interface {
+	Cache
+	GetOrSet(key, value string) string
+}
+
+// IntGetOrSetCache is an optional interface for int-keyed caches that support atomic GetOrSet.
+type IntGetOrSetCache interface {
+	IntCache
+	GetOrSet(key, value int) int
+}

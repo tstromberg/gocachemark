@@ -11,6 +11,7 @@ require (
 	github.com/dgryski/go-s4lru v0.0.0-20150401095600-fd9b33c61bfe
 	github.com/elastic/go-freelru v0.16.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/jellydator/ttlcache/v3 v3.4.0
 	github.com/klauspost/compress v1.18.0
 	github.com/maypok86/otter/v2 v2.2.1
 	github.com/scalalang2/golang-fifo v1.2.0
@@ -28,5 +29,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 )

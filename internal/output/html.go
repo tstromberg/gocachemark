@@ -196,6 +196,24 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		}
 		return max
 	},
+	"maxSetLatency": func(results []benchmark.LatencyResult) float64 {
+		max := 0.0
+		for _, r := range results {
+			if r.SetNsOp > max {
+				max = r.SetNsOp
+			}
+		}
+		return max
+	},
+	"maxSetEvictLatency": func(results []benchmark.LatencyResult) float64 {
+		max := 0.0
+		for _, r := range results {
+			if r.SetEvictNsOp > max {
+				max = r.SetEvictNsOp
+			}
+		}
+		return max
+	},
 	"minLatency": func(results []benchmark.LatencyResult) float64 {
 		min := results[0].GetNsOp
 		for _, r := range results {
@@ -210,6 +228,15 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		for _, r := range results {
 			if r.GetNsOp > max {
 				max = r.GetNsOp
+			}
+		}
+		return max
+	},
+	"maxIntSetLatency": func(results []benchmark.IntLatencyResult) float64 {
+		max := 0.0
+		for _, r := range results {
+			if r.SetNsOp > max {
+				max = r.SetNsOp
 			}
 		}
 		return max
@@ -319,6 +346,23 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         }
         tr:hover { background: #f9f9f9; }
         .best { font-weight: bold; color: #4CAF50; }
+        .cell-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cell-bar {
+            height: 14px;
+            background: linear-gradient(90deg, #2196F3, #03A9F4);
+            border-radius: 3px;
+            min-width: 2px;
+        }
+        .cell-bar.set { background: linear-gradient(90deg, #4CAF50, #8BC34A); }
+        .cell-bar.evict { background: linear-gradient(90deg, #FF9800, #FFC107); }
+        .cell-value {
+            white-space: nowrap;
+            min-width: 50px;
+        }
         .line-chart-container {
             background: white;
             border-radius: 8px;
@@ -398,6 +442,10 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     </div>
 
     <h3>String Keys - Full Table</h3>
+    {{$sortedResults := sortByGetLatency .Latency.Results}}
+    {{$maxGet := maxLatency $sortedResults}}
+    {{$maxSet := maxSetLatency $sortedResults}}
+    {{$maxEvict := maxSetEvictLatency $sortedResults}}
     <table>
         <tr>
             <th>Cache</th>
@@ -408,14 +456,14 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             <th>SetEvict (ns)</th>
             <th>SetEvict allocs</th>
         </tr>
-        {{range sortByGetLatency .Latency.Results}}
+        {{range $sortedResults}}
         <tr>
             <td>{{.Name}}</td>
-            <td>{{ns .GetNsOp}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetNsOp $maxGet}}px"></div><span class="cell-value">{{ns .GetNsOp}}</span></div></td>
             <td>{{.GetAllocs}}</td>
-            <td>{{ns .SetNsOp}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
             <td>{{.SetAllocs}}</td>
-            <td>{{ns .SetEvictNsOp}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
             <td>{{.SetEvictAllocs}}</td>
         </tr>
         {{end}}
@@ -438,6 +486,9 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     </div>
 
     <h3>Int Keys - Full Table</h3>
+    {{$sortedIntResults := sortByIntGetLatency .Latency.IntResults}}
+    {{$maxIntGet := maxIntLatency $sortedIntResults}}
+    {{$maxIntSet := maxIntSetLatency $sortedIntResults}}
     <table>
         <tr>
             <th>Cache</th>
@@ -446,12 +497,12 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             <th>Set (ns)</th>
             <th>Set allocs</th>
         </tr>
-        {{range sortByIntGetLatency .Latency.IntResults}}
+        {{range $sortedIntResults}}
         <tr>
             <td>{{.Name}}</td>
-            <td>{{ns .GetNsOp}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetNsOp $maxIntGet}}px"></div><span class="cell-value">{{ns .GetNsOp}}</span></div></td>
             <td>{{.GetAllocs}}</td>
-            <td>{{ns .SetNsOp}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxIntSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
             <td>{{.SetAllocs}}</td>
         </tr>
         {{end}}

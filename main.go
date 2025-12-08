@@ -1,0 +1,426 @@
+// gocachemark is a user-friendly tool for benchmarking Go cache implementations.
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/tstromberg/gocachemark/internal/benchmark"
+	"github.com/tstromberg/gocachemark/internal/cache"
+	"github.com/tstromberg/gocachemark/internal/output"
+	"github.com/tstromberg/gocachemark/internal/trace"
+)
+
+// testFilter holds which hit rate tests to run.
+var testFilter map[string]bool
+
+func main() {
+	hitRate := flag.Bool("hitrate", false, "Run hit rate benchmarks (CDN, Meta, Zipf traces)")
+	latency := flag.Bool("latency", false, "Run single-threaded latency benchmarks (ns/op)")
+	throughput := flag.Bool("throughput", false, "Run multi-threaded throughput benchmarks (QPS)")
+	memory := flag.Bool("memory", false, "Run memory overhead benchmarks (isolated processes)")
+	all := flag.Bool("all", false, "Run all benchmarks")
+	htmlOut := flag.String("html", "", "Output results to HTML file (e.g., results.html)")
+	caches := flag.String("caches", "", "Comma-separated list of caches to benchmark (default: all)")
+	tests := flag.String("tests", "", "Comma-separated list of hit rate tests: cdn,meta,zipf (default: all)")
+	flag.Parse()
+
+	if !*hitRate && !*latency && !*throughput && !*memory && !*all {
+		printUsage()
+		os.Exit(0)
+	}
+
+	// Apply cache filter
+	if *caches != "" {
+		names := strings.Split(*caches, ",")
+		for i, name := range names {
+			names[i] = strings.TrimSpace(name)
+		}
+		cache.SetFilter(names)
+	}
+
+	// Apply test filter
+	if *tests != "" {
+		testFilter = make(map[string]bool)
+		for _, t := range strings.Split(*tests, ",") {
+			testFilter[strings.TrimSpace(strings.ToLower(t))] = true
+		}
+	}
+
+	printHeader()
+
+	var results output.Results
+
+	if *hitRate || *all {
+		results.HitRate = runHitRateBenchmarks()
+	}
+
+	if *latency || *all {
+		results.Latency = runLatencyBenchmarks()
+	}
+
+	if *throughput || *all {
+		results.Throughput = runThroughputBenchmarks()
+	}
+
+	if *memory || *all {
+		results.Memory = runMemoryBenchmarks()
+	}
+
+	htmlPath := *htmlOut
+	if htmlPath == "" {
+		htmlPath = filepath.Join(os.TempDir(), "gocachemark-results.html")
+	}
+	if err := output.WriteHTML(htmlPath, results); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing HTML: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Results: %s\n", htmlPath)
+}
+
+func printUsage() {
+	fmt.Println("gocachemark - Compare Go cache implementations")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  gocachemark -hitrate     Run hit rate benchmarks")
+	fmt.Println("  gocachemark -latency     Run single-threaded latency (ns/op)")
+	fmt.Println("  gocachemark -throughput  Run multi-threaded throughput (QPS)")
+	fmt.Println("  gocachemark -memory      Run memory overhead benchmarks")
+	fmt.Println("  gocachemark -all         Run all benchmarks")
+	fmt.Println()
+	fmt.Println("Options:")
+	fmt.Println("  -html <file>   Output results to HTML file (default: temp dir)")
+	fmt.Println("  -caches <list> Comma-separated caches to benchmark (default: all)")
+	fmt.Println("  -tests <list>  Comma-separated tests to run (default: all)")
+	fmt.Println()
+	fmt.Println("Available tests:")
+	fmt.Println("  Hit rate:    cdn, meta, zipf")
+	fmt.Println("  Latency:     string, int")
+	fmt.Println("  Throughput:  string-throughput, int-throughput")
+	fmt.Println("  Memory:      memory")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  gocachemark -latency -tests int -caches otter,sfcache")
+	fmt.Println("  gocachemark -hitrate -tests cdn,zipf")
+	fmt.Println("  gocachemark -all -caches otter,theine -html results.html")
+	fmt.Println()
+	fmt.Println("Available caches:")
+	for _, name := range cache.AvailableNames() {
+		fmt.Printf("  - %s\n", name)
+	}
+}
+
+func printHeader() {
+	fmt.Println("=" + strings.Repeat("=", 79))
+	fmt.Println("                       Go Cache Implementation Benchmark")
+	fmt.Println("=" + strings.Repeat("=", 79))
+	fmt.Println()
+	fmt.Printf("Comparing %d cache implementations.\n\n", len(cache.AllNames()))
+}
+
+func shouldRunTest(name string) bool {
+	if testFilter == nil {
+		return true
+	}
+	return testFilter[name]
+}
+
+func runHitRateBenchmarks() *output.HitRateData {
+	sizes := benchmark.DefaultCacheSizes
+	data := &output.HitRateData{Sizes: sizes}
+
+	fmt.Println("-" + strings.Repeat("-", 79))
+	fmt.Println("HIT RATE BENCHMARKS")
+	fmt.Println("-" + strings.Repeat("-", 79))
+	fmt.Println()
+
+	// CDN Trace
+	if shouldRunTest("cdn") {
+		fmt.Printf("### [cdn] %s\n\n", trace.CDNInfo())
+		cdnResults, err := benchmark.RunCDNHitRate(sizes)
+		if err != nil {
+			fmt.Printf("Error: %v\n\n", err)
+		} else {
+			data.CDN = cdnResults
+			printHitRateTable(cdnResults, sizes)
+		}
+	}
+
+	// Meta Trace
+	if shouldRunTest("meta") {
+		fmt.Printf("### [meta] %s\n\n", trace.MetaInfo())
+		metaResults, err := benchmark.RunMetaHitRate(sizes)
+		if err != nil {
+			fmt.Printf("Error: %v\n\n", err)
+		} else {
+			data.Meta = metaResults
+			printHitRateTable(metaResults, sizes)
+		}
+	}
+
+	// Zipf synthetic
+	if shouldRunTest("zipf") {
+		fmt.Println("### [zipf] Zipf synthetic trace (alpha=0.8, 2M ops, 100K keyspace)")
+		fmt.Println()
+		zipfResults := benchmark.RunZipfHitRate(sizes, 100_000, 2_000_000, 0.8)
+		data.Zipf = zipfResults
+		printHitRateTable(zipfResults, sizes)
+	}
+
+	return data
+}
+
+func avgHitRate(r benchmark.HitRateResult, sizes []int) float64 {
+	var sum float64
+	for _, size := range sizes {
+		sum += r.Rates[size]
+	}
+	return sum / float64(len(sizes))
+}
+
+func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
+	sorted := make([]benchmark.HitRateResult, len(results))
+	copy(sorted, results)
+	sort.Slice(sorted, func(i, j int) bool {
+		return avgHitRate(sorted[i], sizes) > avgHitRate(sorted[j], sizes)
+	})
+
+	fmt.Print("| Cache         |")
+	for _, size := range sizes {
+		fmt.Printf(" %5dK |", size/1024)
+	}
+	fmt.Println("    Avg |")
+
+	fmt.Print("|---------------|")
+	for range sizes {
+		fmt.Print("--------|")
+	}
+	fmt.Println("--------|")
+
+	for _, r := range sorted {
+		fmt.Printf("| %-13s |", r.Name)
+		for _, size := range sizes {
+			fmt.Printf(" %5.2f%% |", r.Rates[size])
+		}
+		fmt.Printf(" %5.2f%% |\n", avgHitRate(r, sizes))
+	}
+	fmt.Println()
+
+	if len(sorted) >= 2 {
+		best := sorted[0]
+		second := sorted[1]
+		bestAvg := avgHitRate(best, sizes)
+		secondAvg := avgHitRate(second, sizes)
+		pct := (bestAvg - secondAvg) / secondAvg * 100
+		fmt.Printf("Best: %s (%.2f%% avg, %.2f%% better than %s)\n\n", best.Name, bestAvg, pct, second.Name)
+	}
+}
+
+func runLatencyBenchmarks() *output.LatencyData {
+	fmt.Println("-" + strings.Repeat("-", 99))
+	fmt.Println("LATENCY BENCHMARKS (Single-Threaded)")
+	fmt.Println("-" + strings.Repeat("-", 99))
+	fmt.Println()
+
+	data := &output.LatencyData{}
+
+	// String key benchmarks
+	if shouldRunTest("string") {
+		fmt.Println("### [string] String Keys")
+		fmt.Println()
+		results := benchmark.RunLatency()
+		data.Results = results
+
+		avgLatency := func(r benchmark.LatencyResult) float64 {
+			return (r.GetNsOp + r.SetNsOp) / 2
+		}
+
+		sorted := make([]benchmark.LatencyResult, len(results))
+		copy(sorted, results)
+		sort.Slice(sorted, func(i, j int) bool {
+			return avgLatency(sorted[i]) < avgLatency(sorted[j])
+		})
+
+		fmt.Println("| Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |")
+		fmt.Println("|---------------|--------|-----------|--------|-----------|-------------|----------------|--------|")
+
+		for _, r := range sorted {
+			fmt.Printf("| %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
+				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
+		}
+		fmt.Println()
+
+		if len(sorted) >= 2 {
+			best := sorted[0]
+			second := sorted[1]
+			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
+			fmt.Printf("Best: %s (%.0f ns avg, %.1f%% faster than %s)\n\n", best.Name, avgLatency(best), pct, second.Name)
+		}
+	}
+
+	// Int key benchmarks
+	if shouldRunTest("int") {
+		fmt.Println("### [int] Int Keys")
+		fmt.Println()
+		intResults := benchmark.RunIntLatency()
+		data.IntResults = intResults
+
+		avgIntLatency := func(r benchmark.IntLatencyResult) float64 {
+			return (r.GetNsOp + r.SetNsOp) / 2
+		}
+
+		intSorted := make([]benchmark.IntLatencyResult, len(intResults))
+		copy(intSorted, intResults)
+		sort.Slice(intSorted, func(i, j int) bool {
+			return avgIntLatency(intSorted[i]) < avgIntLatency(intSorted[j])
+		})
+
+		fmt.Println("| Cache         | Get ns | Get alloc | Set ns | Set alloc | Avg ns |")
+		fmt.Println("|---------------|--------|-----------|--------|-----------|--------|")
+
+		for _, r := range intSorted {
+			fmt.Printf("| %-13s | %6.0f | %9d | %6.0f | %9d | %6.0f |\n",
+				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, avgIntLatency(r))
+		}
+		fmt.Println()
+
+		if len(intSorted) >= 2 {
+			best := intSorted[0]
+			second := intSorted[1]
+			pct := (avgIntLatency(second) - avgIntLatency(best)) / avgIntLatency(best) * 100
+			fmt.Printf("Best: %s (%.0f ns avg, %.1f%% faster than %s)\n\n", best.Name, avgIntLatency(best), pct, second.Name)
+		}
+	}
+
+	return data
+}
+
+func runThroughputBenchmarks() *output.ThroughputData {
+	threads := benchmark.DefaultThreadCounts
+
+	fmt.Println("-" + strings.Repeat("-", 79))
+	fmt.Println("THROUGHPUT BENCHMARKS (Multi-Threaded)")
+	fmt.Println("-" + strings.Repeat("-", 79))
+	fmt.Println()
+
+	data := &output.ThroughputData{Threads: threads}
+
+	avgQPS := func(r benchmark.ThroughputResult) float64 {
+		var sum float64
+		for _, t := range threads {
+			sum += r.QPS[t]
+		}
+		return sum / float64(len(threads))
+	}
+
+	printThroughputTable := func(results []benchmark.ThroughputResult) {
+		sorted := make([]benchmark.ThroughputResult, len(results))
+		copy(sorted, results)
+		sort.Slice(sorted, func(i, j int) bool {
+			return avgQPS(sorted[i]) > avgQPS(sorted[j])
+		})
+
+		fmt.Print("| Cache         |")
+		for _, t := range threads {
+			fmt.Printf(" %2dT       |", t)
+		}
+		fmt.Println("       Avg |")
+
+		fmt.Print("|---------------|")
+		for range threads {
+			fmt.Print("-----------|")
+		}
+		fmt.Println("-----------|")
+
+		for _, r := range sorted {
+			fmt.Printf("| %-13s |", r.Name)
+			for _, t := range threads {
+				qps := r.QPS[t]
+				if qps >= 1_000_000 {
+					fmt.Printf(" %6.2fM   |", qps/1_000_000)
+				} else {
+					fmt.Printf(" %6.0fK   |", qps/1_000)
+				}
+			}
+			avg := avgQPS(r)
+			if avg >= 1_000_000 {
+				fmt.Printf(" %6.2fM   |\n", avg/1_000_000)
+			} else {
+				fmt.Printf(" %6.0fK   |\n", avg/1_000)
+			}
+		}
+		fmt.Println()
+
+		if len(sorted) >= 2 {
+			best := sorted[0]
+			second := sorted[1]
+			bestAvg := avgQPS(best)
+			secondAvg := avgQPS(second)
+			pct := (bestAvg - secondAvg) / secondAvg * 100
+			fmt.Printf("Best: %s (%.1f%% faster than %s on average)\n\n", best.Name, pct, second.Name)
+		}
+	}
+
+	// String key throughput
+	if shouldRunTest("string-throughput") {
+		fmt.Println("### [string-throughput] String keys, Zipf workload, 75% reads / 25% writes")
+		fmt.Println()
+		data.Results = benchmark.RunThroughput(threads)
+		printThroughputTable(data.Results)
+	}
+
+	// Int key throughput
+	if shouldRunTest("int-throughput") {
+		fmt.Println("### [int-throughput] Int keys, Zipf workload, 75% reads / 25% writes")
+		fmt.Println()
+		data.IntResults = benchmark.RunIntThroughput(threads)
+		printThroughputTable(data.IntResults)
+	}
+
+	return data
+}
+
+func runMemoryBenchmarks() *output.MemoryData {
+	capacity := benchmark.DefaultMemoryCapacity
+	valSize := benchmark.DefaultValueSize
+
+	fmt.Println("-" + strings.Repeat("-", 79))
+	fmt.Println("MEMORY BENCHMARKS (Isolated Processes)")
+	fmt.Println("-" + strings.Repeat("-", 79))
+	fmt.Println()
+
+	if !shouldRunTest("memory") {
+		return nil
+	}
+
+	fmt.Printf("### [memory] %d items, %d byte values, 3 passes for admission\n\n", capacity, valSize)
+
+	results, err := benchmark.RunMemory(capacity, valSize)
+	if err != nil {
+		fmt.Printf("Error: %v\n\n", err)
+		return nil
+	}
+
+	fmt.Println("| Cache         | Items Stored | Memory (MB) | Overhead (bytes/item) |")
+	fmt.Println("|---------------|--------------|-------------|-----------------------|")
+
+	for _, r := range results {
+		mb := float64(r.Bytes) / 1024 / 1024
+		fmt.Printf("| %-13s | %12d | %8.2f MB | %21d |\n",
+			r.Name, r.Items, mb, r.BytesPerItem)
+	}
+	fmt.Println()
+
+	if len(results) >= 2 {
+		best := results[0]
+		second := results[1]
+		savings := float64(second.Bytes-best.Bytes) / float64(second.Bytes) * 100
+		fmt.Printf("Most efficient: %s (%.1f%% less memory than %s)\n\n", best.Name, savings, second.Name)
+	}
+
+	return &output.MemoryData{Results: results, Capacity: capacity, ValSize: valSize}
+}

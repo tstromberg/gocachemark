@@ -2,17 +2,32 @@ package cache
 
 import "github.com/coocood/freecache"
 
+// freecache internal overhead per entry (header, alignment, etc.)
+const freecacheOverhead = 32
+
 type freecacheCache struct {
 	c *freecache.Cache
 }
 
+// NewFreecache creates a freecache with default entry size estimate.
+// For accurate benchmarks, use NewFreecacheSized with workload-specific entry sizes.
 func NewFreecache(capacity int) Cache {
-	// freecache uses bytes; estimate ~100 bytes per entry for string keys/values
-	cacheBytes := capacity * 100
+	return NewFreecacheSized(capacity, 200) // conservative default
+}
+
+// NewFreecacheSized creates a freecache with a specific entry size.
+// entrySize should be key + value + freecacheOverhead.
+func NewFreecacheSized(capacity, entrySize int) Cache {
+	cacheBytes := capacity * entrySize
 	if cacheBytes < 512*1024 {
 		cacheBytes = 512 * 1024 // minimum 512KB
 	}
 	return &freecacheCache{c: freecache.NewCache(cacheBytes)}
+}
+
+// FreecacheSizedFactory returns a SizedFactory for freecache.
+func FreecacheSizedFactory() SizedFactory {
+	return NewFreecacheSized
 }
 
 func (c *freecacheCache) Get(key string) (string, bool) {

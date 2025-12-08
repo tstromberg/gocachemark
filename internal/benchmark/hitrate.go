@@ -19,6 +19,17 @@ type HitRateResult struct {
 // DefaultCacheSizes are the cache sizes to benchmark.
 var DefaultCacheSizes = []int{16_384, 32_768, 65_536, 131_072, 262_144}
 
+// Entry size constants for different workloads (key + value + overhead).
+// These ensure byte-based caches like freecache are sized fairly.
+const (
+	// CDN trace: avg key ~77 bytes, value=key, ~32 bytes overhead
+	CDNEntrySize = 190
+	// Meta trace: avg key ~10 bytes, value=key, ~32 bytes overhead
+	MetaEntrySize = 55
+	// Zipf trace: key ~6 bytes (int as string), value=key, ~32 bytes overhead
+	ZipfEntrySize = 45
+)
+
 // RunCDNHitRate benchmarks hit rates using the CDN production trace.
 func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
 	ops, err := trace.LoadCDNTrace()
@@ -27,7 +38,7 @@ func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
 	}
 
 	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.All() {
+	for _, factory := range cache.AllWithEntrySize(CDNEntrySize) {
 		c := factory(sizes[0])
 		name := c.Name()
 		c.Close()
@@ -66,7 +77,7 @@ func RunMetaHitRate(sizes []int) ([]HitRateResult, error) {
 	}
 
 	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.All() {
+	for _, factory := range cache.AllWithEntrySize(MetaEntrySize) {
 		c := factory(sizes[0])
 		name := c.Name()
 		c.Close()
@@ -107,7 +118,7 @@ func RunZipfHitRate(sizes []int, keySpace, workloadSize int, alpha float64) []Hi
 	keys := workload.GenerateZipfInt(workloadSize, keySpace, alpha, 42)
 
 	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.All() {
+	for _, factory := range cache.AllWithEntrySize(ZipfEntrySize) {
 		c := factory(sizes[0])
 		name := c.Name()
 		c.Close()

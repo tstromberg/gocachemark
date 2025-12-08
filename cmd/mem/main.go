@@ -104,16 +104,6 @@ func runBaseline(capacity, valSize int) int {
 
 func runSFCache(capacity, valSize int) int {
 	c := sfcache.New[string, []byte](sfcache.Size(capacity))
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize))
-			} else {
-				c.Set(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
@@ -124,16 +114,6 @@ func runSFCache(capacity, valSize int) int {
 
 func runOtter(capacity, valSize int) int {
 	c := otter.Must(&otter.Options[string, []byte]{MaximumSize: capacity})
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize))
-			} else {
-				c.Set(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
@@ -144,16 +124,6 @@ func runOtter(capacity, valSize int) int {
 
 func runTheine(capacity, valSize int) int {
 	c, _ := theine.NewBuilder[string, []byte](int64(capacity)).Build()
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize), 0)
-			} else {
-				c.Set(key, nil, 0)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize), 0)
@@ -164,63 +134,63 @@ func runTheine(capacity, valSize int) int {
 
 func runRistretto(capacity, valSize int) int {
 	c, _ := ristretto.NewCache(&ristretto.Config{
-		NumCounters: int64(capacity * 10),
-		MaxCost:     int64(capacity),
-		BufferItems: 64,
+		NumCounters:        int64(capacity * 10),
+		MaxCost:            int64(capacity),
+		BufferItems:        64,
+		IgnoreInternalCost: true,
 	})
+
+	// Ristretto uses TinyLFU admission - need multiple passes to build frequency
 	for pass := range 3 {
 		for i := range capacity {
 			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize), 1)
-			} else {
-				c.Set(key, nil, 1)
+			c.Set(key, make([]byte, valSize), 1)
+			if pass > 0 {
+				c.Get(key)
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		c.Wait()
 	}
+
+	keepAlive = c
+
+	count := 0
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize), 1)
+		if _, ok := c.Get(key); ok {
+			count++
+		}
 	}
-	time.Sleep(10 * time.Millisecond)
-	keepAlive = c
-	return int(c.Metrics.KeysAdded() - c.Metrics.KeysEvicted())
+	return count
+}
+
+type tinyLFUWrapper struct {
+	c  *tinylfu.T
+	mu sync.Mutex
 }
 
 func runTinyLFU(capacity, valSize int) int {
-	c := tinylfu.NewSync(capacity, capacity*10)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(&tinylfu.Item{Key: key, Value: make([]byte, valSize)})
-			} else {
-				c.Set(&tinylfu.Item{Key: key, Value: nil})
-			}
-		}
-	}
+	// Use non-sync version - SyncT has issues with admission
+	c := tinylfu.New(capacity, capacity*10)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(&tinylfu.Item{Key: key, Value: make([]byte, valSize)})
 	}
-	keepAlive = c
-	// tinylfu.SyncT doesn't expose Len, return capacity
-	return capacity
+	w := &tinyLFUWrapper{c: c}
+	keepAlive = w
+
+	count := 0
+	for i := range capacity {
+		key := "key-" + strconv.Itoa(i)
+		if _, ok := c.Get(key); ok {
+			count++
+		}
+	}
+	return count
 }
 
 func runSieve(capacity, valSize int) int {
 	c := sieve.New[string, []byte](capacity, 0)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize))
-			} else {
-				c.Set(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
@@ -231,16 +201,6 @@ func runSieve(capacity, valSize int) int {
 
 func runS3FIFO(capacity, valSize int) int {
 	c := s3fifo.New[string, []byte](capacity, 0)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize))
-			} else {
-				c.Set(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
@@ -255,16 +215,6 @@ func hashString(s string) uint32 {
 
 func runFreeLRUSharded(capacity, valSize int) int {
 	c, _ := freelru.NewSharded[string, []byte](uint32(capacity), hashString)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Add(key, make([]byte, valSize))
-			} else {
-				c.Add(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
@@ -275,16 +225,6 @@ func runFreeLRUSharded(capacity, valSize int) int {
 
 func runFreeLRUSynced(capacity, valSize int) int {
 	c, _ := freelru.NewSynced[string, []byte](uint32(capacity), hashString)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Add(key, make([]byte, valSize))
-			} else {
-				c.Add(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
@@ -297,16 +237,6 @@ func runFreecache(capacity, valSize int) int {
 	overhead := 256
 	size := capacity * (valSize + overhead)
 	c := freecache.NewCache(size)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set([]byte(key), make([]byte, valSize), 0)
-			} else {
-				c.Set([]byte(key), nil, 0)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set([]byte(key), make([]byte, valSize), 0)
@@ -317,16 +247,6 @@ func runFreecache(capacity, valSize int) int {
 
 func runTwoQueue(capacity, valSize int) int {
 	c, _ := lru2.New2Q[string, []byte](capacity)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Add(key, make([]byte, valSize))
-			} else {
-				c.Add(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
@@ -336,62 +256,28 @@ func runTwoQueue(capacity, valSize int) int {
 }
 
 func runS4LRU(capacity, valSize int) int {
-	c := s4lru.New(capacity)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize))
-			} else {
-				c.Set(key, nil)
-			}
-		}
-	}
+	// s4lru divides capacity across 4 segments, so multiply by 4
+	c := s4lru.New(capacity * 4)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
 	keepAlive = c
-	return capacity
+	return c.Len()
 }
 
 func runClock(capacity, valSize int) int {
 	c := clock.NewCache[string, []byte](clock.WithCapacity(capacity))
-	var mu sync.Mutex
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			mu.Lock()
-			if pass == 0 {
-				c.Set(key, make([]byte, valSize))
-			} else {
-				c.Set(key, nil)
-			}
-			mu.Unlock()
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		mu.Lock()
 		c.Set(key, make([]byte, valSize))
-		mu.Unlock()
 	}
 	keepAlive = c
-	return capacity
+	return c.Len()
 }
 
 func runLRU(capacity, valSize int) int {
 	c, _ := lru2.New[string, []byte](capacity)
-	for pass := range 3 {
-		for i := range capacity {
-			key := "key-" + strconv.Itoa(i)
-			if pass == 0 {
-				c.Add(key, make([]byte, valSize))
-			} else {
-				c.Add(key, nil)
-			}
-		}
-	}
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))

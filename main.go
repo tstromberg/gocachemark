@@ -432,12 +432,12 @@ func runMemoryBenchmarks() *output.MemoryData {
 		return nil
 	}
 
-	fmt.Println("| Cache         | Items Stored | Memory (MB) | Overhead (bytes/item) |")
-	fmt.Println("|---------------|--------------|-------------|-----------------------|")
+	fmt.Println("| Cache         | Items Stored | Memory (MB) | Overhead vs map (bytes/item) |")
+	fmt.Println("|---------------|--------------|-------------|------------------------------|")
 
 	for _, r := range results {
 		mb := float64(r.Bytes) / 1024 / 1024
-		fmt.Printf("| %-13s | %12d | %8.2f MB | %21d |\n",
+		fmt.Printf("| %-13s | %12d | %9.2f MB | %28d |\n",
 			r.Name, r.Items, mb, r.BytesPerItem)
 	}
 	fmt.Println()

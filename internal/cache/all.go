@@ -18,6 +18,12 @@ var registry = map[string]Factory{
 	"lru":           NewLRU,
 }
 
+// sizedRegistry maps cache names to their sized factory functions.
+// Only caches that need entry size information are included.
+var sizedRegistry = map[string]SizedFactory{
+	"freecache": NewFreecacheSized,
+}
+
 // intRegistry maps cache names to their int-keyed factory functions.
 var intRegistry = map[string]IntFactory{
 	"sfcache":       NewSFCacheInt,
@@ -93,6 +99,29 @@ func AllInt() []IntFactory {
 			continue
 		}
 		if f, ok := intRegistry[name]; ok {
+			factories = append(factories, f)
+		}
+	}
+	return factories
+}
+
+// AllWithEntrySize returns factories for all caches, using the specified entry size
+// for byte-based caches like freecache. Other caches ignore the entry size.
+func AllWithEntrySize(entrySize int) []Factory {
+	var factories []Factory
+	for _, name := range defaultOrder {
+		if Filter != nil && !Filter[name] {
+			continue
+		}
+		// Use sized factory if available, otherwise use regular factory
+		if sf, ok := sizedRegistry[name]; ok {
+			// Wrap sized factory to match Factory signature
+			// Capture sf in local variable to avoid closure bug
+			sizedFactory := sf
+			factories = append(factories, func(capacity int) Cache {
+				return sizedFactory(capacity, entrySize)
+			})
+		} else if f, ok := registry[name]; ok {
 			factories = append(factories, f)
 		}
 	}

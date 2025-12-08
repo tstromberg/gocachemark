@@ -539,7 +539,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 {{if .Memory}}
     <h2>Memory Overhead Benchmarks</h2>
     <p>Capacity: {{.Memory.Capacity}} items, Value size: {{.Memory.ValSize}} bytes</p>
-    <p>Measured in isolated processes for accuracy. Lower is better.</p>
+    <p>Measured in isolated processes for accuracy. Overhead is compared to a baseline <code>map[string][]byte</code>. Lower is better.</p>
 
     <h3>Memory Usage (MB)</h3>
     <div class="chart-container">
@@ -562,7 +562,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             <th>Cache</th>
             <th>Items Stored</th>
             <th>Memory (MB)</th>
-            <th>Overhead (bytes/item)</th>
+            <th>Overhead vs map (bytes/item)</th>
         </tr>
         {{range .Memory.Results}}
         <tr>

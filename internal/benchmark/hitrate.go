@@ -28,6 +28,10 @@ const (
 	MetaEntrySize = 55
 	// Zipf trace: key ~6 bytes (int as string), value=key, ~32 bytes overhead
 	ZipfEntrySize = 45
+	// Twitter trace: avg key ~40 bytes, value=key, ~32 bytes overhead
+	TwitterEntrySize = 110
+	// Wikipedia trace: avg key ~10 bytes, value=key, ~32 bytes overhead
+	WikipediaEntrySize = 55
 )
 
 // RunCDNHitRate benchmarks hit rates using the CDN production trace.
@@ -147,4 +151,82 @@ func runZipfTrace(factory cache.Factory, keys []int, cacheSize int) float64 {
 		}
 	}
 	return float64(hits) / float64(len(keys)) * 100
+}
+
+// RunTwitterHitRate benchmarks hit rates using the Twitter production trace.
+func RunTwitterHitRate(sizes []int) ([]HitRateResult, error) {
+	ops, err := trace.LoadTwitterTrace()
+	if err != nil {
+		return nil, fmt.Errorf("load Twitter trace: %w", err)
+	}
+
+	results := make([]HitRateResult, 0, len(cache.All()))
+	for _, factory := range cache.AllWithEntrySize(TwitterEntrySize) {
+		c := factory(sizes[0])
+		name := c.Name()
+		c.Close()
+
+		rates := make(map[int]float64)
+		for _, size := range sizes {
+			rates[size] = runTwitterTrace(factory, ops, size)
+		}
+		results = append(results, HitRateResult{Name: name, Rates: rates})
+	}
+
+	return results, nil
+}
+
+func runTwitterTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+	c := factory(cacheSize)
+	defer c.Close()
+
+	var hits, misses int64
+	for _, key := range ops {
+		if _, ok := c.Get(key); ok {
+			hits++
+		} else {
+			misses++
+			c.Set(key, key)
+		}
+	}
+	return float64(hits) / float64(hits+misses) * 100
+}
+
+// RunWikipediaHitRate benchmarks hit rates using the Wikipedia CDN upload trace.
+func RunWikipediaHitRate(sizes []int) ([]HitRateResult, error) {
+	ops, err := trace.LoadWikipediaTrace()
+	if err != nil {
+		return nil, fmt.Errorf("load Wikipedia trace: %w", err)
+	}
+
+	results := make([]HitRateResult, 0, len(cache.All()))
+	for _, factory := range cache.AllWithEntrySize(WikipediaEntrySize) {
+		c := factory(sizes[0])
+		name := c.Name()
+		c.Close()
+
+		rates := make(map[int]float64)
+		for _, size := range sizes {
+			rates[size] = runWikipediaTrace(factory, ops, size)
+		}
+		results = append(results, HitRateResult{Name: name, Rates: rates})
+	}
+
+	return results, nil
+}
+
+func runWikipediaTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+	c := factory(cacheSize)
+	defer c.Close()
+
+	var hits, misses int64
+	for _, key := range ops {
+		if _, ok := c.Get(key); ok {
+			hits++
+		} else {
+			misses++
+			c.Set(key, key)
+		}
+	}
+	return float64(hits) / float64(hits+misses) * 100
 }

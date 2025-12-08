@@ -24,7 +24,7 @@ replace github.com/codeGROOVE-dev/sfcache/pkg/persist => /Users/t/dev/r2r/sfcach
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/codeGROOVE-dev/sfcache/pkg/persist v1.1.3 // indirect
+	github.com/codeGROOVE-dev/sfcache/pkg/persist v1.1.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

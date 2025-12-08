@@ -29,10 +29,12 @@ type MemoryData struct {
 
 // HitRateData holds hit rate benchmark data.
 type HitRateData struct {
-	CDN  []benchmark.HitRateResult
-	Meta []benchmark.HitRateResult
-	Zipf []benchmark.HitRateResult
-	Sizes []int
+	CDN       []benchmark.HitRateResult
+	Meta      []benchmark.HitRateResult
+	Zipf      []benchmark.HitRateResult
+	Twitter   []benchmark.HitRateResult
+	Wikipedia []benchmark.HitRateResult
+	Sizes     []int
 }
 
 // LatencyData holds latency benchmark data.

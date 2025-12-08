@@ -11,7 +11,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-//go:embed testdata/reag0c01_20230315_20230322_0.2000.csv.zstd
+//go:embed testdata/reag0c01_keys_only.csv.zst
 var cdnTraceCompressed []byte
 
 var (
@@ -44,24 +44,8 @@ func LoadCDNTrace() ([]string, error) {
 		scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
 		ops := make([]string, 0, 2_000_000)
 
-		// Skip header
-		if scanner.Scan() {
-			// header line - skip
-		}
-
 		for scanner.Scan() {
-			line := scanner.Text()
-			// Find first and second comma to extract cacheKey
-			firstComma := strings.Index(line, ",")
-			if firstComma < 0 {
-				continue
-			}
-			rest := line[firstComma+1:]
-			secondComma := strings.Index(rest, ",")
-			if secondComma < 0 {
-				continue
-			}
-			key := rest[:secondComma]
+			key := scanner.Text()
 			if key != "" {
 				ops = append(ops, key)
 			}

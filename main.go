@@ -105,6 +105,8 @@ func main() {
 		results.Memory = runMemoryBenchmarks()
 	}
 
+	printOverallRanking(results)
+
 	htmlPath := *htmlOut
 	if htmlPath == "" {
 		htmlPath = filepath.Join(os.TempDir(), "gocachemark-results.html")
@@ -134,7 +136,7 @@ func printUsage() {
 	fmt.Println("  -threads <list>  Comma-separated thread counts for throughput (default: 1,8,16,32)")
 	fmt.Println()
 	fmt.Println("Available tests:")
-	fmt.Println("  Hit rate:    cdn, meta, zipf")
+	fmt.Println("  Hit rate:    cdn, meta, zipf, twitter, wikipedia")
 	fmt.Println("  Latency:     string, int")
 	fmt.Println("  Throughput:  string-throughput, int-throughput")
 	fmt.Println("  Memory:      memory")
@@ -214,6 +216,30 @@ func runHitRateBenchmarks() *output.HitRateData {
 		zipfResults := benchmark.RunZipfHitRate(sizes, 100_000, 2_000_000, 0.8)
 		data.Zipf = zipfResults
 		printHitRateTable(zipfResults, sizes)
+	}
+
+	// Twitter Trace
+	if shouldRunTest("twitter") {
+		fmt.Printf("### [twitter] %s\n\n", trace.TwitterInfo())
+		twitterResults, err := benchmark.RunTwitterHitRate(sizes)
+		if err != nil {
+			fmt.Printf("Error: %v\n\n", err)
+		} else {
+			data.Twitter = twitterResults
+			printHitRateTable(twitterResults, sizes)
+		}
+	}
+
+	// Wikipedia Trace
+	if shouldRunTest("wikipedia") {
+		fmt.Printf("### [wikipedia] %s\n\n", trace.WikipediaInfo())
+		wikipediaResults, err := benchmark.RunWikipediaHitRate(sizes)
+		if err != nil {
+			fmt.Printf("Error: %v\n\n", err)
+		} else {
+			data.Wikipedia = wikipediaResults
+			printHitRateTable(wikipediaResults, sizes)
+		}
 	}
 
 	return data
@@ -468,4 +494,193 @@ func runMemoryBenchmarks() *output.MemoryData {
 	}
 
 	return &output.MemoryData{Results: results, Capacity: capacity, ValSize: valSize}
+}
+
+func printOverallRanking(results output.Results) {
+	scores := make(map[string]float64)
+
+	// Assign points based on ranking position in each test
+	// Points: 1st=10, 2nd=7, 3rd=5, 4th=4, 5th=3, 6th=2, 7th=1, rest=0
+	assignPoints := func(names []string) {
+		points := []float64{10, 7, 5, 4, 3, 2, 1}
+		for i, name := range names {
+			if i < len(points) {
+				scores[name] += points[i]
+			}
+		}
+	}
+
+	// Hit rate benchmarks - rank by average hit rate (higher is better)
+	if results.HitRate != nil {
+		if results.HitRate.CDN != nil && len(results.HitRate.CDN) > 0 {
+			sorted := make([]benchmark.HitRateResult, len(results.HitRate.CDN))
+			copy(sorted, results.HitRate.CDN)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.HitRate.Meta != nil && len(results.HitRate.Meta) > 0 {
+			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Meta))
+			copy(sorted, results.HitRate.Meta)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.HitRate.Zipf != nil && len(results.HitRate.Zipf) > 0 {
+			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Zipf))
+			copy(sorted, results.HitRate.Zipf)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.HitRate.Twitter != nil && len(results.HitRate.Twitter) > 0 {
+			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Twitter))
+			copy(sorted, results.HitRate.Twitter)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.HitRate.Wikipedia != nil && len(results.HitRate.Wikipedia) > 0 {
+			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Wikipedia))
+			copy(sorted, results.HitRate.Wikipedia)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+	}
+
+	// Latency benchmarks - rank by average latency (lower is better)
+	if results.Latency != nil {
+		if results.Latency.Results != nil && len(results.Latency.Results) > 0 {
+			avgLatency := func(r benchmark.LatencyResult) float64 {
+				return (r.GetNsOp + r.SetNsOp) / 2
+			}
+			sorted := make([]benchmark.LatencyResult, len(results.Latency.Results))
+			copy(sorted, results.Latency.Results)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgLatency(sorted[i]) < avgLatency(sorted[j])
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.Latency.IntResults != nil && len(results.Latency.IntResults) > 0 {
+			avgIntLatency := func(r benchmark.IntLatencyResult) float64 {
+				return (r.GetNsOp + r.SetNsOp) / 2
+			}
+			sorted := make([]benchmark.IntLatencyResult, len(results.Latency.IntResults))
+			copy(sorted, results.Latency.IntResults)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgIntLatency(sorted[i]) < avgIntLatency(sorted[j])
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+	}
+
+	// Throughput benchmarks - rank by average QPS (higher is better)
+	if results.Throughput != nil {
+		avgQPS := func(r benchmark.ThroughputResult) float64 {
+			var sum float64
+			for _, qps := range r.QPS {
+				sum += qps
+			}
+			return sum / float64(len(r.QPS))
+		}
+
+		if results.Throughput.Results != nil && len(results.Throughput.Results) > 0 {
+			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.Results))
+			copy(sorted, results.Throughput.Results)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgQPS(sorted[i]) > avgQPS(sorted[j])
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+		if results.Throughput.IntResults != nil && len(results.Throughput.IntResults) > 0 {
+			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.IntResults))
+			copy(sorted, results.Throughput.IntResults)
+			sort.Slice(sorted, func(i, j int) bool {
+				return avgQPS(sorted[i]) > avgQPS(sorted[j])
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
+			}
+			assignPoints(names)
+		}
+	}
+
+	// Memory benchmark - rank by memory usage (lower is better)
+	if results.Memory != nil && results.Memory.Results != nil && len(results.Memory.Results) > 0 {
+		var names []string
+		for _, r := range results.Memory.Results {
+			names = append(names, r.Name)
+		}
+		assignPoints(names)
+	}
+
+	// No tests were run
+	if len(scores) == 0 {
+		return
+	}
+
+	// Sort caches by score
+	type ranking struct {
+		name  string
+		score float64
+	}
+	var rankings []ranking
+	for name, score := range scores {
+		rankings = append(rankings, ranking{name, score})
+	}
+	sort.Slice(rankings, func(i, j int) bool {
+		return rankings[i].score > rankings[j].score
+	})
+
+	// Print top 3
+	fmt.Println("=" + strings.Repeat("=", 79))
+	fmt.Println("OVERALL RANKING (ranked voting across all tests)")
+	fmt.Println("=" + strings.Repeat("=", 79))
+	fmt.Println()
+
+	for i := 0; i < len(rankings) && i < 3; i++ {
+		r := rankings[i]
+		medal := []string{"🥇", "🥈", "🥉"}[i]
+		fmt.Printf("%s #%d: %s (%.0f points)\n", medal, i+1, r.name, r.score)
+	}
+	fmt.Println()
 }

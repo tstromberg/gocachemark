@@ -18,6 +18,9 @@ import (
 // testFilter holds which hit rate tests to run.
 var testFilter map[string]bool
 
+// cacheSizes holds the cache sizes to benchmark.
+var cacheSizes []int
+
 func main() {
 	hitRate := flag.Bool("hitrate", false, "Run hit rate benchmarks (CDN, Meta, Zipf traces)")
 	latency := flag.Bool("latency", false, "Run single-threaded latency benchmarks (ns/op)")
@@ -27,6 +30,7 @@ func main() {
 	htmlOut := flag.String("html", "", "Output results to HTML file (e.g., results.html)")
 	caches := flag.String("caches", "", "Comma-separated list of caches to benchmark (default: all)")
 	tests := flag.String("tests", "", "Comma-separated list of hit rate tests: cdn,meta,zipf (default: all)")
+	sizes := flag.String("sizes", "", "Comma-separated cache sizes in K (e.g., 16,32,64,128,256)")
 	flag.Parse()
 
 	if !*hitRate && !*latency && !*throughput && !*memory && !*all {
@@ -48,6 +52,19 @@ func main() {
 		testFilter = make(map[string]bool)
 		for _, t := range strings.Split(*tests, ",") {
 			testFilter[strings.TrimSpace(strings.ToLower(t))] = true
+		}
+	}
+
+	// Apply cache sizes
+	cacheSizes = benchmark.DefaultCacheSizes
+	if *sizes != "" {
+		cacheSizes = nil
+		for _, s := range strings.Split(*sizes, ",") {
+			s = strings.TrimSpace(s)
+			var size int
+			if _, err := fmt.Sscanf(s, "%d", &size); err == nil {
+				cacheSizes = append(cacheSizes, size*1024)
+			}
 		}
 	}
 
@@ -96,6 +113,7 @@ func printUsage() {
 	fmt.Println("  -html <file>   Output results to HTML file (default: temp dir)")
 	fmt.Println("  -caches <list> Comma-separated caches to benchmark (default: all)")
 	fmt.Println("  -tests <list>  Comma-separated tests to run (default: all)")
+	fmt.Println("  -sizes <list>  Comma-separated cache sizes in K (default: 16,32,64,128,256)")
 	fmt.Println()
 	fmt.Println("Available tests:")
 	fmt.Println("  Hit rate:    cdn, meta, zipf")
@@ -119,7 +137,16 @@ func printHeader() {
 	fmt.Println("                       Go Cache Implementation Benchmark")
 	fmt.Println("=" + strings.Repeat("=", 79))
 	fmt.Println()
-	fmt.Printf("Comparing %d cache implementations.\n\n", len(cache.AllNames()))
+	fmt.Printf("Comparing %d cache implementations.\n", len(cache.AllNames()))
+	fmt.Printf("Cache sizes: ")
+	for i, size := range cacheSizes {
+		if i > 0 {
+			fmt.Printf(", ")
+		}
+		fmt.Printf("%dK", size/1024)
+	}
+	fmt.Println()
+	fmt.Println()
 }
 
 func shouldRunTest(name string) bool {
@@ -130,7 +157,7 @@ func shouldRunTest(name string) bool {
 }
 
 func runHitRateBenchmarks() *output.HitRateData {
-	sizes := benchmark.DefaultCacheSizes
+	sizes := cacheSizes
 	data := &output.HitRateData{Sizes: sizes}
 
 	fmt.Println("-" + strings.Repeat("-", 79))

@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>gocachemark - Go Cache Benchmark Results</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            line-height: 1.6;
+            color: #333;
+        }
+        @media print {
+            body { padding: 20px; }
+            .podium-container { page-break-inside: avoid; }
+            .chart-container { page-break-inside: avoid; }
+        }
+        h1 {
+            color: #000;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            font-size: 2em;
+            font-weight: 600;
+        }
+        h2 {
+            color: #000;
+            margin-top: 50px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        h3 {
+            color: #333;
+            margin-top: 30px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        h4 {
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 20px;
+        }
+        .timestamp a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .timestamp a:hover {
+            text-decoration: underline;
+        }
+        .benchmark-info-top {
+            padding: 15px;
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            font-size: 0.9em;
+        }
+        .benchmark-info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, auto);
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+        .benchmark-info-top .info-item {
+            display: flex;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .benchmark-info-command {
+            display: flex;
+            gap: 8px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        .benchmark-info-top .info-label {
+            font-weight: 600;
+            color: #000;
+        }
+        .benchmark-info-top .info-value {
+            color: #555;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .benchmark-info-command .info-value {
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .podium-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 20px;
+            margin: 40px 0;
+            padding: 30px;
+            border: 1px solid #ddd;
+            height: 280px;
+        }
+        .podium-item {
+            text-align: center;
+            border: 2px solid #000;
+            padding: 20px 30px;
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .podium-item.first {
+            order: 2;
+            background: #FFD700;
+            border-color: #DAA520;
+            border-width: 3px;
+        }
+        .podium-item.second {
+            order: 1;
+            background: #C0C0C0;
+            border-color: #A8A8A8;
+        }
+        .podium-item.third {
+            order: 3;
+            background: #CD7F32;
+            border-color: #B87333;
+            color: #000;
+        }
+        .medal {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .rank {
+            font-size: 0.9em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cache-name {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin: 10px 0;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .score {
+            font-size: 1em;
+            font-weight: 500;
+            color: #666;
+        }
+        .section-header {
+            padding: 15px 0;
+            margin: 40px 0 20px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .section-header h2 {
+            margin: 0;
+            border: none;
+        }
+        .section-header p {
+            margin: 10px 0 0 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .toc {
+            padding: 20px 0;
+            margin: 30px 0;
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+        .toc h2 {
+            margin: 0 0 15px 0;
+            color: #000;
+            border: none;
+            font-size: 1.2em;
+        }
+        .toc ul {
+            list-style: disc;
+            padding-left: 20px;
+            margin: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+        }
+        .toc a {
+            text-decoration: none;
+            color: #0066cc;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .toc a .icon {
+            margin-right: 8px;
+        }
+        .collapsible-section {
+            border: 1px solid #ddd;
+            margin: 30px 0;
+            background: white;
+        }
+        .section-toggle {
+            cursor: pointer;
+            padding: 15px 20px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+        .section-toggle h2 {
+            margin: 0;
+            color: #000;
+            border: none;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        .section-toggle .toggle-icon {
+            font-size: 1.5em;
+        }
+        .section-toggle.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+        .section-content {
+            padding: 30px;
+        }
+        .section-content.collapsed {
+            display: none;
+        }
+        .suite-description {
+            margin: 0 0 20px 0;
+            padding: 10px 0 10px 15px;
+            border-left: 3px solid #666;
+            color: #555;
+        }
+        .chart-container {
+            padding: 20px;
+            margin: 30px 0;
+            border: 1px solid #ddd;
+        }
+        footer {
+            margin-top: 60px;
+            padding: 20px 0;
+            border-top: 1px solid #ddd;
+            color: #999;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        footer a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        .bar-row {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            height: 24px;
+        }
+        .bar-label {
+            width: 120px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #000;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .bar-container {
+            flex: 1;
+            height: 18px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            overflow: hidden;
+        }
+        .bar {
+            height: 100%;
+            background: #2E7D32;
+        }
+        .bar-value {
+            width: 90px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            padding-left: 10px;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .bar.latency { background: #2E7D32; }
+        .bar.memory { background: #2E7D32; }
+        .bar.throughput { background: #2E7D32; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid #ddd;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f5f5f5;
+            color: #000;
+            font-weight: 600;
+            border-bottom: 2px solid #000;
+        }
+        td {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        td:first-child {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-weight: 500;
+        }
+        .best { font-weight: bold; }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 25px;
+        }
+        th.sortable:hover {
+            background: #e5e5e5;
+        }
+        th.sortable::after {
+            content: '▼';
+            position: absolute;
+            right: 8px;
+            opacity: 0.3;
+            font-size: 0.7em;
+        }
+        th.sortable.sorted-asc::after {
+            content: '▲';
+            opacity: 1;
+        }
+        th.sortable.sorted-desc::after {
+            content: '▼';
+            opacity: 1;
+        }
+        .cell-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cell-bar {
+            height: 12px;
+            background: #2E7D32;
+            min-width: 2px;
+        }
+        .cell-bar.set { background: #388E3C; }
+        .cell-bar.evict { background: #43A047; }
+        .cell-value {
+            white-space: nowrap;
+            min-width: 50px;
+        }
+        .line-chart-container {
+            padding: 20px;
+            margin: 30px 0;
+            border: 1px solid #ddd;
+            height: 400px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>gocachemark</h1>
+    <p class="timestamp">
+        Benchmark report for Go cache implementations.
+        <a href="https://github.com/tstromberg/gocachemark" target="_blank">View on GitHub →</a>
+    </p>
+
+    <div class="benchmark-info-top">
+        <div class="benchmark-info-grid">
+            <div class="info-item">
+                <span class="info-label">Generated:</span>
+                <span class="info-value">2025-12-08 18:06:47 EST</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Machine:</span>
+                <span class="info-value">darwin/arm64 (16 CPUs)</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Go Version:</span>
+                <span class="info-value">go1.25.4</span>
+            </div>
+        </div>
+        <div class="benchmark-info-command info-item">
+            <span class="info-label">Command:</span>
+            <span class="info-value">gocachemark -all</span>
+        </div>
+    </div>
+
+
+    <div class="section-header">
+        <h2>Overall Winners</h2>
+        <p>Ranked voting across all benchmarks</p>
+    </div>
+
+    <div class="podium-container">
+        
+        
+        
+        
+        
+        
+            
+        
+        <div class="podium-item first" style="height: 200px;">
+            <div class="rank">1st Place</div>
+            <div class="cache-name">sfcache</div>
+            <div class="score">100 points</div>
+        </div>
+        
+        
+        
+        
+        
+            
+        
+        <div class="podium-item second" style="height: 120px;">
+            <div class="rank">2nd Place</div>
+            <div class="cache-name">otter</div>
+            <div class="score">60 points</div>
+        </div>
+        
+        
+        
+        
+        
+            
+        
+        <div class="podium-item third" style="height: 70px;">
+            <div class="rank">3rd Place</div>
+            <div class="cache-name">freelru-shard</div>
+            <div class="score">35 points</div>
+        </div>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+    </div>
+
+
+<div class="toc">
+    <h2>Table of Contents</h2>
+    <ul>
+        <li><a href="#hitrate">Hit Rate Benchmarks</a></li>
+        <li><a href="#latency">Latency Benchmarks</a></li>
+        <li><a href="#throughput">Throughput Benchmarks</a></li>
+        <li><a href="#memory">Memory Benchmarks</a></li>
+    </ul>
+</div>
+
+
+<div class="collapsible-section" id="hitrate">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Hit Rate Benchmarks</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Higher hit rates mean better cache effectiveness. Tests measure how often requested items are found in the cache across different cache sizes.</p>
+
+    
+    
+
+    
+    <h3>CDN Production Trace</h3>
+    <p class="suite-description">2M operations, ~768K unique keys</p>
+    <div class="line-chart-container">
+        <canvas id="cdnChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">16K</th><th class="sortable">32K</th><th class="sortable">64K</th><th class="sortable">128K</th><th class="sortable">256K</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>56.21%</td><td>57.55%</td><td>58.59%</td><td>59.70%</td><td>60.55%</td>
+            <td style="font-weight:bold;">58.52%</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>55.69%</td><td>56.95%</td><td>58.33%</td><td>59.61%</td><td>60.55%</td>
+            <td style="font-weight:bold;">58.23%</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>55.57%</td><td>57.02%</td><td>58.35%</td><td>59.56%</td><td>60.61%</td>
+            <td style="font-weight:bold;">58.22%</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>55.63%</td><td>56.95%</td><td>58.25%</td><td>59.30%</td><td>60.59%</td>
+            <td style="font-weight:bold;">58.14%</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>55.09%</td><td>56.68%</td><td>58.14%</td><td>59.42%</td><td>60.57%</td>
+            <td style="font-weight:bold;">57.98%</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>54.90%</td><td>56.52%</td><td>57.94%</td><td>59.35%</td><td>60.53%</td>
+            <td style="font-weight:bold;">57.85%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>54.90%</td><td>56.52%</td><td>57.94%</td><td>59.35%</td><td>60.53%</td>
+            <td style="font-weight:bold;">57.85%</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>54.90%</td><td>56.52%</td><td>57.94%</td><td>59.35%</td><td>60.53%</td>
+            <td style="font-weight:bold;">57.85%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>54.89%</td><td>56.51%</td><td>57.94%</td><td>59.34%</td><td>60.53%</td>
+            <td style="font-weight:bold;">57.84%</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>55.42%</td><td>56.64%</td><td>57.79%</td><td>58.82%</td><td>59.67%</td>
+            <td style="font-weight:bold;">57.67%</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>53.86%</td><td>55.46%</td><td>56.98%</td><td>58.47%</td><td>59.87%</td>
+            <td style="font-weight:bold;">56.93%</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>54.72%</td><td>55.21%</td><td>55.91%</td><td>57.29%</td><td>59.02%</td>
+            <td style="font-weight:bold;">56.43%</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>54.14%</td><td>55.35%</td><td>56.08%</td><td>56.82%</td><td>58.25%</td>
+            <td style="font-weight:bold;">56.13%</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>54.32%</td><td>55.19%</td><td>55.35%</td><td>55.87%</td><td>59.29%</td>
+            <td style="font-weight:bold;">56.01%</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>35.27%</td><td>37.23%</td><td>38.74%</td><td>39.30%</td><td>42.43%</td>
+            <td style="font-weight:bold;">38.59%</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    <h3 style="margin-top: 50px;">Meta KVCache Production Trace</h3>
+    <p class="suite-description">5M operations</p>
+    <div class="line-chart-container">
+        <canvas id="metaChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">16K</th><th class="sortable">32K</th><th class="sortable">64K</th><th class="sortable">128K</th><th class="sortable">256K</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>57.87%</td><td>66.71%</td><td>74.00%</td><td>80.09%</td><td>84.64%</td>
+            <td style="font-weight:bold;">72.66%</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>55.36%</td><td>64.63%</td><td>72.30%</td><td>78.90%</td><td>84.07%</td>
+            <td style="font-weight:bold;">71.05%</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>56.76%</td><td>65.23%</td><td>71.94%</td><td>77.01%</td><td>81.10%</td>
+            <td style="font-weight:bold;">70.41%</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>51.77%</td><td>61.38%</td><td>70.09%</td><td>77.61%</td><td>83.36%</td>
+            <td style="font-weight:bold;">68.84%</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>53.82%</td><td>62.04%</td><td>69.59%</td><td>76.27%</td><td>81.97%</td>
+            <td style="font-weight:bold;">68.74%</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>51.04%</td><td>60.45%</td><td>69.58%</td><td>77.77%</td><td>83.83%</td>
+            <td style="font-weight:bold;">68.53%</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>50.63%</td><td>59.64%</td><td>69.34%</td><td>77.77%</td><td>83.90%</td>
+            <td style="font-weight:bold;">68.26%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>50.63%</td><td>59.64%</td><td>69.34%</td><td>77.77%</td><td>83.90%</td>
+            <td style="font-weight:bold;">68.26%</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>50.63%</td><td>59.64%</td><td>69.34%</td><td>77.77%</td><td>83.90%</td>
+            <td style="font-weight:bold;">68.26%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>50.54%</td><td>59.65%</td><td>69.30%</td><td>77.73%</td><td>83.89%</td>
+            <td style="font-weight:bold;">68.22%</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>49.82%</td><td>59.51%</td><td>68.87%</td><td>76.99%</td><td>83.41%</td>
+            <td style="font-weight:bold;">67.72%</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>50.61%</td><td>58.85%</td><td>67.51%</td><td>75.96%</td><td>82.33%</td>
+            <td style="font-weight:bold;">67.05%</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>52.40%</td><td>53.54%</td><td>56.54%</td><td>61.62%</td><td>69.22%</td>
+            <td style="font-weight:bold;">58.66%</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>33.79%</td><td>39.64%</td><td>55.23%</td><td>72.11%</td><td>80.61%</td>
+            <td style="font-weight:bold;">56.28%</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>27.15%</td><td>36.31%</td><td>45.67%</td><td>52.95%</td><td>60.39%</td>
+            <td style="font-weight:bold;">44.49%</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    <h3 style="margin-top: 50px;">Zipf Synthetic Trace</h3>
+    <p class="suite-description">alpha=0.8, 2M operations, 100K keyspace</p>
+    <div class="line-chart-container">
+        <canvas id="zipfChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">16K</th><th class="sortable">32K</th><th class="sortable">64K</th><th class="sortable">128K</th><th class="sortable">256K</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>theine</td>
+            <td>63.11%</td><td>74.13%</td><td>87.08%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.87%</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>62.96%</td><td>73.57%</td><td>86.92%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.70%</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>61.93%</td><td>73.40%</td><td>86.66%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.40%</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>61.56%</td><td>73.07%</td><td>87.00%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.33%</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>61.44%</td><td>73.16%</td><td>87.01%</td><td>95.01%</td><td>95.00%</td>
+            <td style="font-weight:bold;">82.33%</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>56.91%</td><td>72.56%</td><td>91.63%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.23%</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>61.74%</td><td>72.40%</td><td>86.91%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.22%</td>
+        </tr>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>61.33%</td><td>72.34%</td><td>86.78%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">82.09%</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>61.04%</td><td>72.03%</td><td>85.44%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">81.71%</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>59.77%</td><td>70.97%</td><td>85.93%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">81.34%</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>56.54%</td><td>70.48%</td><td>86.60%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">80.73%</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>55.57%</td><td>69.55%</td><td>86.11%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">80.25%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>55.57%</td><td>69.55%</td><td>86.11%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">80.25%</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>55.57%</td><td>69.55%</td><td>86.11%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">80.25%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>55.47%</td><td>69.50%</td><td>86.07%</td><td>95.01%</td><td>95.01%</td>
+            <td style="font-weight:bold;">80.21%</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    <h3 style="margin-top: 50px;">Twitter Production Cache Trace</h3>
+    <p class="suite-description">2M operations, cluster001+cluster052</p>
+    <div class="line-chart-container">
+        <canvas id="twitterChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">16K</th><th class="sortable">32K</th><th class="sortable">64K</th><th class="sortable">128K</th><th class="sortable">256K</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>81.83%</td><td>83.64%</td><td>84.95%</td><td>85.97%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.63%</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>80.97%</td><td>83.05%</td><td>84.88%</td><td>86.17%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.37%</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>80.97%</td><td>82.96%</td><td>84.60%</td><td>86.08%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.28%</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>80.89%</td><td>82.93%</td><td>84.68%</td><td>85.97%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.25%</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>80.38%</td><td>82.58%</td><td>84.71%</td><td>86.28%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.14%</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>80.37%</td><td>82.56%</td><td>84.50%</td><td>86.18%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.08%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>80.37%</td><td>82.56%</td><td>84.50%</td><td>86.18%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.08%</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>80.37%</td><td>82.56%</td><td>84.50%</td><td>86.18%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.08%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>80.34%</td><td>82.56%</td><td>84.49%</td><td>86.18%</td><td>86.77%</td>
+            <td style="font-weight:bold;">84.07%</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>80.88%</td><td>82.76%</td><td>84.25%</td><td>85.46%</td><td>86.43%</td>
+            <td style="font-weight:bold;">83.96%</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>80.03%</td><td>82.28%</td><td>84.26%</td><td>86.00%</td><td>86.77%</td>
+            <td style="font-weight:bold;">83.87%</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>79.70%</td><td>81.32%</td><td>83.94%</td><td>85.79%</td><td>86.77%</td>
+            <td style="font-weight:bold;">83.50%</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>78.26%</td><td>81.14%</td><td>84.03%</td><td>85.82%</td><td>86.77%</td>
+            <td style="font-weight:bold;">83.21%</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>80.22%</td><td>81.58%</td><td>82.56%</td><td>84.15%</td><td>86.77%</td>
+            <td style="font-weight:bold;">83.06%</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>70.49%</td><td>72.41%</td><td>75.89%</td><td>79.47%</td><td>85.17%</td>
+            <td style="font-weight:bold;">76.69%</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    <h3 style="margin-top: 50px;">Wikipedia CDN Upload Trace</h3>
+    <p class="suite-description">2M operations, upload.wikimedia.org</p>
+    <div class="line-chart-container">
+        <canvas id="wikipediaChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">16K</th><th class="sortable">32K</th><th class="sortable">64K</th><th class="sortable">128K</th><th class="sortable">256K</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>22.09%</td><td>26.13%</td><td>30.67%</td><td>35.50%</td><td>40.32%</td>
+            <td style="font-weight:bold;">30.94%</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>20.76%</td><td>25.03%</td><td>30.05%</td><td>35.66%</td><td>41.38%</td>
+            <td style="font-weight:bold;">30.58%</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>21.83%</td><td>25.73%</td><td>30.17%</td><td>35.01%</td><td>40.14%</td>
+            <td style="font-weight:bold;">30.57%</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>21.11%</td><td>25.10%</td><td>29.72%</td><td>34.97%</td><td>40.43%</td>
+            <td style="font-weight:bold;">30.27%</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>19.61%</td><td>23.92%</td><td>29.16%</td><td>34.83%</td><td>40.95%</td>
+            <td style="font-weight:bold;">29.69%</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>21.39%</td><td>25.01%</td><td>28.92%</td><td>33.56%</td><td>39.31%</td>
+            <td style="font-weight:bold;">29.64%</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>18.98%</td><td>22.76%</td><td>27.80%</td><td>33.84%</td><td>39.34%</td>
+            <td style="font-weight:bold;">28.54%</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>18.16%</td><td>22.43%</td><td>27.32%</td><td>33.00%</td><td>38.14%</td>
+            <td style="font-weight:bold;">27.81%</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>15.46%</td><td>19.36%</td><td>24.45%</td><td>31.15%</td><td>38.93%</td>
+            <td style="font-weight:bold;">25.87%</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>18.97%</td><td>21.91%</td><td>25.27%</td><td>29.22%</td><td>33.75%</td>
+            <td style="font-weight:bold;">25.82%</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>15.08%</td><td>19.02%</td><td>24.07%</td><td>30.66%</td><td>38.43%</td>
+            <td style="font-weight:bold;">25.45%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>15.08%</td><td>19.02%</td><td>24.07%</td><td>30.66%</td><td>38.43%</td>
+            <td style="font-weight:bold;">25.45%</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>15.08%</td><td>19.02%</td><td>24.07%</td><td>30.66%</td><td>38.43%</td>
+            <td style="font-weight:bold;">25.45%</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>15.06%</td><td>19.00%</td><td>24.04%</td><td>30.65%</td><td>38.42%</td>
+            <td style="font-weight:bold;">25.44%</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>14.52%</td><td>18.59%</td><td>23.73%</td><td>30.29%</td><td>37.97%</td>
+            <td style="font-weight:bold;">25.02%</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+    </div>
+</div>
+
+
+
+<div class="collapsible-section" id="latency">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Latency Benchmarks (Single-Threaded)</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Lower latency means faster operations. Measures the time (in nanoseconds) for individual Get, Set, and SetEvict operations in a single-threaded environment.</p>
+
+    
+    
+    
+    
+
+    <h3>String Keys</h3>
+
+    <h4>Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">Get (ns)</th>
+            <th class="sortable">Get allocs</th>
+            <th class="sortable">Set (ns)</th>
+            <th class="sortable">Set allocs</th>
+            <th class="sortable">SetEvict (ns)</th>
+            <th class="sortable">SetEvict allocs</th>
+            <th class="sortable">Avg (ns)</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 3.1784841075794623px"></div><span class="cell-value">13.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 12.410501193317423px"></div><span class="cell-value">52.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 34.11458333333333px"></div><span class="cell-value">131.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">32.5</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 4.400977995110025px"></div><span class="cell-value">18.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 15.035799522673033px"></div><span class="cell-value">63.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 16.927083333333336px"></div><span class="cell-value">65.0</span></div></td>
+            <td>1</td>
+            <td style="font-weight:bold;">40.5</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 4.645476772616137px"></div><span class="cell-value">19.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 5.250596658711217px"></div><span class="cell-value">22.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 27.864583333333332px"></div><span class="cell-value">107.0</span></div></td>
+            <td>2</td>
+            <td style="font-weight:bold;">20.5</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 5.8679706601467px"></div><span class="cell-value">24.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 5.727923627684964px"></div><span class="cell-value">24.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 9.375px"></div><span class="cell-value">36.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">24.0</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 5.8679706601467px"></div><span class="cell-value">24.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 8.83054892601432px"></div><span class="cell-value">37.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 12.239583333333332px"></div><span class="cell-value">47.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">30.5</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 6.356968215158925px"></div><span class="cell-value">26.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 10.739856801909307px"></div><span class="cell-value">45.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 51.041666666666664px"></div><span class="cell-value">196.0</span></div></td>
+            <td>3</td>
+            <td style="font-weight:bold;">35.5</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 6.601466992665037px"></div><span class="cell-value">27.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 6.682577565632458px"></div><span class="cell-value">28.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 26.041666666666668px"></div><span class="cell-value">100.0</span></div></td>
+            <td>1</td>
+            <td style="font-weight:bold;">27.5</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 7.334963325183375px"></div><span class="cell-value">30.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 11.217183770883054px"></div><span class="cell-value">47.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 92.70833333333334px"></div><span class="cell-value">356.0</span></div></td>
+            <td>4</td>
+            <td style="font-weight:bold;">38.5</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 7.579462102689487px"></div><span class="cell-value">31.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 7.159904534606206px"></div><span class="cell-value">30.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 62.239583333333336px"></div><span class="cell-value">239.0</span></div></td>
+            <td>1</td>
+            <td style="font-weight:bold;">30.5</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 8.312958435207824px"></div><span class="cell-value">34.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 33.65155131264916px"></div><span class="cell-value">141.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 44.27083333333333px"></div><span class="cell-value">170.0</span></div></td>
+            <td>1</td>
+            <td style="font-weight:bold;">87.5</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 14.180929095354522px"></div><span class="cell-value">58.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 63.961813842482094px"></div><span class="cell-value">268.0</span></div></td>
+            <td>3</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 30.208333333333332px"></div><span class="cell-value">116.0</span></div></td>
+            <td>4</td>
+            <td style="font-weight:bold;">163.0</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 20.048899755501225px"></div><span class="cell-value">82.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 28.162291169451077px"></div><span class="cell-value">118.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 54.166666666666664px"></div><span class="cell-value">208.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">100.0</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 20.537897310513447px"></div><span class="cell-value">84.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 25.53699284009546px"></div><span class="cell-value">107.0</span></div></td>
+            <td>3</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 30.46875px"></div><span class="cell-value">117.0</span></div></td>
+            <td>3</td>
+            <td style="font-weight:bold;">95.5</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 20.537897310513447px"></div><span class="cell-value">84.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 13.60381861575179px"></div><span class="cell-value">57.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 27.34375px"></div><span class="cell-value">105.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">70.5</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 100px"></div><span class="cell-value">409.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 100px"></div><span class="cell-value">419.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 100px"></div><span class="cell-value">384.0</span></div></td>
+            <td>3</td>
+            <td style="font-weight:bold;">414.0</td>
+        </tr>
+        
+        </tbody>
+    </table>
+
+    
+    
+    
+    
+    
+
+    <h3 style="margin-top: 40px;">Int Keys</h3>
+
+    <h4>Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">Get (ns)</th>
+            <th class="sortable">Get allocs</th>
+            <th class="sortable">Set (ns)</th>
+            <th class="sortable">Set allocs</th>
+            <th class="sortable">SetEvict (ns)</th>
+            <th class="sortable">SetEvict allocs</th>
+            <th class="sortable">Avg (ns)</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 1.6355140186915886px"></div><span class="cell-value">7.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 3.8186157517899764px"></div><span class="cell-value">16.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 5.084745762711865px"></div><span class="cell-value">18.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">11.5</td>
+        </tr>
+        
+        <tr>
+            <td>sfcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 2.102803738317757px"></div><span class="cell-value">9.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 5.727923627684964px"></div><span class="cell-value">24.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 27.401129943502823px"></div><span class="cell-value">97.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">16.5</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 8.177570093457943px"></div><span class="cell-value">35.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 32.21957040572792px"></div><span class="cell-value">135.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 46.32768361581921px"></div><span class="cell-value">164.0</span></div></td>
+            <td>1</td>
+            <td style="font-weight:bold;">85.0</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 18.22429906542056px"></div><span class="cell-value">78.0</span></div></td>
+            <td>1</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 26.25298329355609px"></div><span class="cell-value">110.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 50px"></div><span class="cell-value">177.0</span></div></td>
+            <td>0</td>
+            <td style="font-weight:bold;">94.0</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 100px"></div><span class="cell-value">428.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: 100px"></div><span class="cell-value">419.0</span></div></td>
+            <td>0</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: 100px"></div><span class="cell-value">354.0</span></div></td>
+            <td>3</td>
+            <td style="font-weight:bold;">423.5</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    
+    
+    <h3 style="margin-top: 40px;">String Keys - GetOrSet</h3>
+    <p class="suite-description">GetOrSet is an atomic operation that gets a value if it exists, or sets it if it doesn't. Only caches that support this operation are shown.</p>
+
+    <h4>GetOrSet Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">GetOrSet (ns)</th>
+            <th class="sortable">GetOrSet allocs</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>otter</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 12.053571428571429px; background: #2E7D32;"></div><span class="cell-value">54.0</span></div></td>
+            <td>1</td>
+        </tr>
+        
+        <tr>
+            <td>sfcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 17.410714285714285px; background: #2E7D32;"></div><span class="cell-value">78.0</span></div></td>
+            <td>0</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 19.196428571428573px; background: #2E7D32;"></div><span class="cell-value">86.0</span></div></td>
+            <td>1</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 100px; background: #2E7D32;"></div><span class="cell-value">448.0</span></div></td>
+            <td>0</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    
+    
+    
+    <h3 style="margin-top: 40px;">Int Keys - GetOrSet</h3>
+    <p class="suite-description">GetOrSet latency for integer keys. Only caches that support this operation are shown.</p>
+
+    <h4>GetOrSet Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">GetOrSet (ns)</th>
+            <th class="sortable">GetOrSet allocs</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 2.2675736961451247px; background: #2E7D32;"></div><span class="cell-value">10.0</span></div></td>
+            <td>0</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 10.204081632653061px; background: #2E7D32;"></div><span class="cell-value">45.0</span></div></td>
+            <td>1</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 100px; background: #2E7D32;"></div><span class="cell-value">441.0</span></div></td>
+            <td>0</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+    
+
+    </div>
+</div>
+
+
+
+<div class="collapsible-section" id="throughput">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Throughput Benchmarks (Multi-Threaded)</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Higher throughput means more queries per second (QPS). Tests measure concurrent performance with a Zipf workload (75% reads, 25% writes) across different thread counts.</p>
+
+    
+    
+
+    
+    <h3>String Keys</h3>
+    <div class="line-chart-container">
+        <canvas id="throughputChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">1T</th><th class="sortable">8T</th><th class="sortable">16T</th><th class="sortable">32T</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>30.33M</td><td>42.09M</td><td>35.03M</td><td>37.07M</td>
+            <td style="font-weight:bold;">36.13M</td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>12.85M</td><td>27.41M</td><td>26.24M</td><td>29.30M</td>
+            <td style="font-weight:bold;">23.95M</td>
+        </tr>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>45.05M</td><td>31.90M</td><td>29.77M</td><td>26.49M</td>
+            <td style="font-weight:bold;">33.30M</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>11.97M</td><td>10.94M</td><td>10.38M</td><td>10.95M</td>
+            <td style="font-weight:bold;">11.06M</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>6.60M</td><td>9.41M</td><td>8.32M</td><td>8.74M</td>
+            <td style="font-weight:bold;">8.27M</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>28.68M</td><td>7.05M</td><td>6.13M</td><td>7.86M</td>
+            <td style="font-weight:bold;">12.43M</td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>46.82M</td><td>7.05M</td><td>6.41M</td><td>7.30M</td>
+            <td style="font-weight:bold;">16.90M</td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>39.37M</td><td>7.37M</td><td>6.58M</td><td>6.96M</td>
+            <td style="font-weight:bold;">15.07M</td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>7.68M</td><td>8.39M</td><td>6.38M</td><td>6.34M</td>
+            <td style="font-weight:bold;">7.20M</td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>35.76M</td><td>5.86M</td><td>4.94M</td><td>6.10M</td>
+            <td style="font-weight:bold;">13.17M</td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>24.39M</td><td>6.21M</td><td>5.70M</td><td>6.10M</td>
+            <td style="font-weight:bold;">10.60M</td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>31.13M</td><td>5.70M</td><td>4.84M</td><td>5.75M</td>
+            <td style="font-weight:bold;">11.86M</td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>18.50M</td><td>5.11M</td><td>4.28M</td><td>4.92M</td>
+            <td style="font-weight:bold;">8.20M</td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>13.82M</td><td>3.98M</td><td>3.68M</td><td>3.90M</td>
+            <td style="font-weight:bold;">6.35M</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>7.33M</td><td>3.33M</td><td>2.87M</td><td>2.96M</td>
+            <td style="font-weight:bold;">4.12M</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+
+    
+    <h3 style="margin-top: 50px;">Int Keys</h3>
+    <div class="line-chart-container">
+        <canvas id="throughputIntChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">1T</th><th class="sortable">8T</th><th class="sortable">16T</th><th class="sortable">32T</th>
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>85.09M</td><td>39.17M</td><td>31.89M</td><td>29.01M</td>
+            <td style="font-weight:bold;">46.29M</td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>54.98M</td><td>11.04M</td><td>11.23M</td><td>12.01M</td>
+            <td style="font-weight:bold;">22.31M</td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>13.83M</td><td>10.93M</td><td>10.73M</td><td>10.58M</td>
+            <td style="font-weight:bold;">11.52M</td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>7.01M</td><td>9.34M</td><td>8.37M</td><td>8.96M</td>
+            <td style="font-weight:bold;">8.42M</td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>7.58M</td><td>3.30M</td><td>2.81M</td><td>2.63M</td>
+            <td style="font-weight:bold;">4.08M</td>
+        </tr>
+        
+        </tbody>
+    </table>
+    
+    </div>
+</div>
+
+
+
+<div class="collapsible-section" id="memory">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Memory Overhead Benchmarks</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Capacity: 32768 items, Value size: 1024 bytes. Measured in isolated processes. Overhead compared to baseline <code>map[string][]byte</code>. Lower is better.</p>
+
+    
+    
+    <h3>Memory Results</h3>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">Items Stored</th>
+            <th class="sortable">Memory (MB)</th>
+            <th class="sortable">Overhead vs map (bytes/item)</th>
+        </tr>
+        </thead>
+        <tbody>
+        
+        <tr>
+            <td>freelru-sync</td>
+            <td>32768</td>
+            <td>35.19</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: -6.993006993006993px"></div><span class="cell-value">-20</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>otter</td>
+            <td>32768</td>
+            <td>36.28</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 4.895104895104895px"></div><span class="cell-value">14</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>freelru-shard</td>
+            <td>31606</td>
+            <td>36.47</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 7.3426573426573425px"></div><span class="cell-value">21</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>clock</td>
+            <td>32768</td>
+            <td>37.03</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 13.286713286713287px"></div><span class="cell-value">38</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>sfcache</td>
+            <td>32667</td>
+            <td>37.17</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 15.034965034965033px"></div><span class="cell-value">43</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>2q</td>
+            <td>32768</td>
+            <td>37.50</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 18.53146853146853px"></div><span class="cell-value">53</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>lru</td>
+            <td>32768</td>
+            <td>37.52</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 18.88111888111888px"></div><span class="cell-value">54</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>s4lru</td>
+            <td>32768</td>
+            <td>38.27</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 27.27272727272727px"></div><span class="cell-value">78</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>theine</td>
+            <td>32768</td>
+            <td>38.47</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 29.37062937062937px"></div><span class="cell-value">84</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>sieve</td>
+            <td>32768</td>
+            <td>39.53</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 41.25874125874126px"></div><span class="cell-value">118</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>s3-fifo</td>
+            <td>32768</td>
+            <td>39.53</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 41.25874125874126px"></div><span class="cell-value">118</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>tinylfu</td>
+            <td>32767</td>
+            <td>39.83</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 44.75524475524475px"></div><span class="cell-value">128</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>ttlcache</td>
+            <td>32768</td>
+            <td>40.82</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 55.59440559440559px"></div><span class="cell-value">159</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>ristretto</td>
+            <td>32768</td>
+            <td>41.47</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 62.93706293706294px"></div><span class="cell-value">180</span></div></td>
+        </tr>
+        
+        <tr>
+            <td>freecache</td>
+            <td>32764</td>
+            <td>44.77</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: 100px"></div><span class="cell-value">286</span></div></td>
+        </tr>
+        
+        </tbody>
+    </table>
+    </div>
+</div>
+
+
+<script>
+function createLineChart(canvasId, labels, datasets, yLabel, useLogY = false) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    const yAxisConfig = {
+        title: { display: true, text: yLabel },
+        beginAtZero: false
+    };
+
+    if (useLogY) {
+        yAxisConfig.type = 'logarithmic';
+        yAxisConfig.min = 1;
+        yAxisConfig.ticks = {
+            callback: function(value, index, ticks) {
+                
+                if (value === 1 || value === 10 || value === 100 ||
+                    value === 5 || value === 50) {
+                    return value;
+                }
+                return null;
+            }
+        };
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right' }
+            },
+            scales: {
+                y: yAxisConfig,
+                x: {
+                    title: { display: true, text: 'Cache Size' }
+                }
+            }
+        }
+    });
+}
+
+function makeSortable(table) {
+    const headers = table.querySelectorAll('th.sortable');
+    const tbody = table.querySelector('tbody') || table;
+
+    headers.forEach((header, index) => {
+        header.addEventListener('click', () => {
+            const currentSort = header.classList.contains('sorted-desc') ? 'desc' :
+                              header.classList.contains('sorted-asc') ? 'asc' : 'none';
+            const newSort = currentSort === 'desc' ? 'asc' : 'desc';
+
+            
+            headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+
+            
+            header.classList.add(newSort === 'asc' ? 'sorted-asc' : 'sorted-desc');
+
+            
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            
+            rows.sort((a, b) => {
+                let aVal = a.cells[index].textContent.trim();
+                let bVal = b.cells[index].textContent.trim();
+
+                
+                aVal = aVal.replace(/%|ns|K|M|MB/g, '');
+                bVal = bVal.replace(/%|ns|K|M|MB/g, '');
+
+                
+                const aNum = parseFloat(aVal);
+                const bNum = parseFloat(bVal);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return newSort === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+
+                
+                return newSort === 'asc' ?
+                    aVal.localeCompare(bVal) :
+                    bVal.localeCompare(aVal);
+            });
+
+            
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    });
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('table').forEach(table => {
+        if (table.querySelector('th.sortable')) {
+            makeSortable(table);
+
+            
+            const avgHeader = Array.from(table.querySelectorAll('th.sortable'))
+                .find(th => th.textContent.trim() === 'Avg' || th.textContent.trim() === 'Average');
+            if (avgHeader) {
+                avgHeader.click(); 
+            }
+        }
+    });
+
+    
+    document.querySelectorAll('.toc a').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = document.querySelector(link.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ block: 'start' });
+                
+                const content = target.querySelector('.section-content');
+                const toggle = target.querySelector('.section-toggle');
+                if (content && content.classList.contains('collapsed')) {
+                    toggleSection(toggle);
+                }
+            }
+        });
+    });
+});
+
+function toggleSection(toggleElement) {
+    const content = toggleElement.nextElementSibling;
+    toggleElement.classList.toggle('collapsed');
+    content.classList.toggle('collapsed');
+}
+
+
+
+
+createLineChart('cdnChart', ["16K","32K","64K","128K","256K"], [{label:"sfcache",data:[56.21,57.55,58.59,59.70,60.55],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[54.72,55.21,55.91,57.29,59.02],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[54.32,55.19,55.35,55.87,59.29],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[54.90,56.52,57.94,59.35,60.53],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[35.27,37.23,38.74,39.30,42.43],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[54.14,55.35,56.08,56.82,58.25],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[55.63,56.95,58.25,59.30,60.59],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[55.69,56.95,58.33,59.61,60.55],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[54.89,56.51,57.94,59.34,60.53],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[54.90,56.52,57.94,59.35,60.53],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[53.86,55.46,56.98,58.47,59.87],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[55.57,57.02,58.35,59.56,60.61],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[55.42,56.64,57.79,58.82,59.67],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[55.09,56.68,58.14,59.42,60.57],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[54.90,56.52,57.94,59.35,60.53],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'Hit Rate (%)', false);
+
+
+createLineChart('metaChart', ["16K","32K","64K","128K","256K"], [{label:"sfcache",data:[57.87,66.71,74.00,80.09,84.64],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[33.79,39.64,55.23,72.11,80.61],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[56.76,65.23,71.94,77.01,81.10],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[50.63,59.64,69.34,77.77,83.90],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[27.15,36.31,45.67,52.95,60.39],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[52.40,53.54,56.54,61.62,69.22],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[51.77,61.38,70.09,77.61,83.36],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[55.36,64.63,72.30,78.90,84.07],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[50.54,59.65,69.30,77.73,83.89],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[50.63,59.64,69.34,77.77,83.90],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[50.61,58.85,67.51,75.96,82.33],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[51.04,60.45,69.58,77.77,83.83],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[53.82,62.04,69.59,76.27,81.97],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[49.82,59.51,68.87,76.99,83.41],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[50.63,59.64,69.34,77.77,83.90],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'Hit Rate (%)', false);
+
+
+createLineChart('zipfChart', ["16K","32K","64K","128K","256K"], [{label:"sfcache",data:[61.33,72.34,86.78,95.01,95.01],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[61.93,73.40,86.66,95.01,95.01],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[63.11,74.13,87.08,95.01,95.01],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[55.57,69.55,86.11,95.01,95.01],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[61.44,73.16,87.01,95.01,95.00],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[62.96,73.57,86.92,95.01,95.01],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[61.56,73.07,87.00,95.01,95.01],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[61.74,72.40,86.91,95.01,95.01],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[55.47,69.50,86.07,95.01,95.01],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[55.57,69.55,86.11,95.01,95.01],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[56.91,72.56,91.63,95.01,95.01],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[59.77,70.97,85.93,95.01,95.01],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[61.04,72.03,85.44,95.01,95.01],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[56.54,70.48,86.60,95.01,95.01],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[55.57,69.55,86.11,95.01,95.01],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'Hit Rate (%)', false);
+
+
+createLineChart('twitterChart', ["16K","32K","64K","128K","256K"], [{label:"sfcache",data:[81.83,83.64,84.95,85.97,86.77],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[79.70,81.32,83.94,85.79,86.77],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[80.22,81.58,82.56,84.15,86.77],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[80.37,82.56,84.50,86.18,86.77],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[70.49,72.41,75.89,79.47,85.17],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[78.26,81.14,84.03,85.82,86.77],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[80.97,82.96,84.60,86.08,86.77],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[80.89,82.93,84.68,85.97,86.77],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[80.34,82.56,84.49,86.18,86.77],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[80.37,82.56,84.50,86.18,86.77],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[80.38,82.58,84.71,86.28,86.77],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[80.97,83.05,84.88,86.17,86.77],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[80.88,82.76,84.25,85.46,86.43],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[80.03,82.28,84.26,86.00,86.77],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[80.37,82.56,84.50,86.18,86.77],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'Hit Rate (%)', false);
+
+
+createLineChart('wikipediaChart', ["16K","32K","64K","128K","256K"], [{label:"sfcache",data:[22.09,26.13,30.67,35.50,40.32],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[18.98,22.76,27.80,33.84,39.34],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[21.11,25.10,29.72,34.97,40.43],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[15.08,19.02,24.07,30.66,38.43],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[18.16,22.43,27.32,33.00,38.14],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[21.39,25.01,28.92,33.56,39.31],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[19.61,23.92,29.16,34.83,40.95],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[21.83,25.73,30.17,35.01,40.14],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[15.06,19.00,24.04,30.65,38.42],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[15.08,19.02,24.07,30.66,38.43],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[14.52,18.59,23.73,30.29,37.97],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[20.76,25.03,30.05,35.66,41.38],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[18.97,21.91,25.27,29.22,33.75],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[15.46,19.36,24.45,31.15,38.93],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[15.08,19.02,24.07,30.66,38.43],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'Hit Rate (%)', false);
+
+
+
+
+
+
+createLineChart('throughputChart', ["1T","8T","16T","32T"], [{label:"sfcache",data:[45049000,31898000,29774000,26490000],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[11969000,10940000,10384000,10946000],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[6597000,9411000,8320000,8745000],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[7333000,3328000,2869000,2957000],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[7681000,8386000,6382000,6340000],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[18496000,5113000,4276000,4923000],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[39366000,7371000,6575000,6959000],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[24387000,6205000,5700000,6102000],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[30326000,42086000,35029000,37070000],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[28684000,7051000,6132000,7860000],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[12847000,27415000,26240000,29299000],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[31129000,5699000,4839000,5753000],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[13824000,3975000,3683000,3903000],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[46822000,7052000,6409000,7299000],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[35757000,5857000,4944000,6104000],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'QPS');
+
+
+createLineChart('throughputIntChart', ["1T","8T","16T","32T"], [{label:"sfcache",data:[85090000,39170000,31887000,29009000],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[13831000,10930000,10735000,10579000],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[7013000,9341000,8374000,8960000],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[7585000,3301000,2814000,2631000],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[54980000,11035000,11228000,12007000],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'QPS');
+
+
+</script>
+
+<footer>
+    Generated by <a href="https://github.com/tstromberg/gocachemark" target="_blank">gocachemark</a>
+</footer>
+
+</body>
+</html>

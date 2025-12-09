@@ -1893,12 +1893,14 @@ createLineChart('throughputChart', ["1T","8T","16T","32T"], [{label:"sfcache",da
 createLineChart('throughputIntChart', ["1T","8T","16T","32T"], [{label:"sfcache",data:[85090000,39170000,31887000,29009000],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[13831000,10930000,10735000,10579000],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[7013000,9341000,8374000,8960000],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[7585000,3301000,2814000,2631000],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[54980000,11035000,11228000,12007000],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'QPS');
 }
 
-// Wait for Chart.js to load (needed for htmlpreview.github.io)
-(function waitForChart() {
-    if (typeof Chart !== 'undefined') {
+// Wait for Chart.js and DOM to be ready (needed for htmlpreview.github.io)
+(function waitForChartAndDOM() {
+    if (typeof Chart !== 'undefined' && document.getElementById('cdnChart')) {
+        initCharts();
+    } else if (document.readyState === 'complete' && typeof Chart !== 'undefined') {
         initCharts();
     } else {
-        setTimeout(waitForChart, 50);
+        setTimeout(waitForChartAndDOM, 100);
     }
 })();
 </script>

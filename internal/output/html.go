@@ -1428,12 +1428,14 @@ createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDat
 {{end}}
 }
 
-// Wait for Chart.js to load (needed for htmlpreview.github.io)
-(function waitForChart() {
-    if (typeof Chart !== 'undefined') {
+// Wait for Chart.js and DOM to be ready (needed for htmlpreview.github.io)
+(function waitForChartAndDOM() {
+    if (typeof Chart !== 'undefined' && document.getElementById('cdnChart')) {
+        initCharts();
+    } else if (document.readyState === 'complete' && typeof Chart !== 'undefined') {
         initCharts();
     } else {
-        setTimeout(waitForChart, 50);
+        setTimeout(waitForChartAndDOM, 100);
     }
 })();
 </script>

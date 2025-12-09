@@ -1397,6 +1397,7 @@ function toggleSection(toggleElement) {
     content.classList.toggle('collapsed');
 }
 
+function initCharts() {
 {{if .HitRate}}
 {{$sizes := .HitRate.Sizes}}
 {{if .HitRate.CDN}}
@@ -1425,6 +1426,16 @@ createLineChart('throughputChart', {{threadLabels $threads}}, {{throughputDatase
 createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntResults $threads}}, 'QPS');
 {{end}}
 {{end}}
+}
+
+// Wait for Chart.js to load (needed for htmlpreview.github.io)
+(function waitForChart() {
+    if (typeof Chart !== 'undefined') {
+        initCharts();
+    } else {
+        setTimeout(waitForChart, 50);
+    }
+})();
 </script>
 
 <footer>

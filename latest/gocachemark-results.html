@@ -1867,9 +1867,7 @@ function toggleSection(toggleElement) {
     content.classList.toggle('collapsed');
 }
 
-
-
-
+function initCharts() {
 createLineChart('cdnChart', ["16K","32K","64K","128K","256K"], [{label:"sfcache",data:[56.21,57.55,58.59,59.70,60.55],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[54.72,55.21,55.91,57.29,59.02],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[54.32,55.19,55.35,55.87,59.29],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[54.90,56.52,57.94,59.35,60.53],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ristretto",data:[35.27,37.23,38.74,39.30,42.43],borderColor:"#7B1FA2",backgroundColor:"#7B1FA2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"tinylfu",data:[54.14,55.35,56.08,56.82,58.25],borderColor:"#C2185B",backgroundColor:"#C2185B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"sieve",data:[55.63,56.95,58.25,59.30,60.59],borderColor:"#5D4037",backgroundColor:"#5D4037",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s3-fifo",data:[55.69,56.95,58.33,59.61,60.55],borderColor:"#455A64",backgroundColor:"#455A64",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[54.89,56.51,57.94,59.34,60.53],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-sync",data:[54.90,56.52,57.94,59.35,60.53],borderColor:"#00796B",backgroundColor:"#00796B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freecache",data:[53.86,55.46,56.98,58.47,59.87],borderColor:"#F57C00",backgroundColor:"#F57C00",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"2q",data:[55.57,57.02,58.35,59.56,60.61],borderColor:"#E64A19",backgroundColor:"#E64A19",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"s4lru",data:[55.42,56.64,57.79,58.82,59.67],borderColor:"#512DA8",backgroundColor:"#512DA8",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"clock",data:[55.09,56.68,58.14,59.42,60.57],borderColor:"#00695C",backgroundColor:"#00695C",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"lru",data:[54.90,56.52,57.94,59.35,60.53],borderColor:"#AFB42B",backgroundColor:"#AFB42B",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'Hit Rate (%)', false);
 
 
@@ -1893,8 +1891,16 @@ createLineChart('throughputChart', ["1T","8T","16T","32T"], [{label:"sfcache",da
 
 
 createLineChart('throughputIntChart', ["1T","8T","16T","32T"], [{label:"sfcache",data:[85090000,39170000,31887000,29009000],borderColor:"#2E7D32",backgroundColor:"#2E7D32",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"otter",data:[13831000,10930000,10735000,10579000],borderColor:"#1976D2",backgroundColor:"#1976D2",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"theine",data:[7013000,9341000,8374000,8960000],borderColor:"#D32F2F",backgroundColor:"#D32F2F",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"ttlcache",data:[7585000,3301000,2814000,2631000],borderColor:"#0097A7",backgroundColor:"#0097A7",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5},{label:"freelru-shard",data:[54980000,11035000,11228000,12007000],borderColor:"#0288D1",backgroundColor:"#0288D1",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}], 'QPS');
+}
 
-
+// Wait for Chart.js to load (needed for htmlpreview.github.io)
+(function waitForChart() {
+    if (typeof Chart !== 'undefined') {
+        initCharts();
+    } else {
+        setTimeout(waitForChart, 50);
+    }
+})();
 </script>
 
 <footer>

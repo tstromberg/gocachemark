@@ -13,6 +13,24 @@ A modern (2025) benchmarking tool for comparing Go cache implementations.
 
 View the [full benchmark report](https://htmlpreview.github.io/?https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.html) for detailed results across hit rate, latency, throughput, and memory benchmarks.
 
+## Benchmarked caches
+
+- [2q](https://github.com/hashicorp/golang-lru) - Two-queue cache
+- [clock](https://github.com/Code-Hex/go-generics-cache) - CLOCK eviction algorithm
+- [freecache](https://github.com/coocood/freecache) - Zero GC cache
+- [freelru-shard](https://github.com/elastic/go-freelru) - GC-friendly sharded LRU from Elastic
+- [freelru-sync](https://github.com/elastic/go-freelru) - GC-friendly synced LRU from Elastic
+- [lru](https://github.com/hashicorp/golang-lru) - HashiCorp's LRU implementation
+- [otter](https://github.com/maypok86/otter) - High-performance cache with S3-FIFO eviction
+- [ristretto](https://github.com/dgraph-io/ristretto) - Fast concurrent cache from Dgraph
+- [s3-fifo](https://github.com/scalalang2/golang-fifo) - S3-FIFO eviction algorithm
+- [s4lru](https://github.com/dgryski/go-s4lru) - Segmented LRU
+- [sfcache](https://github.com/codeGROOVE-dev/sfcache) - High-performance cache with W-TinyLFU
+- [sieve](https://github.com/scalalang2/golang-fifo) - SIEVE eviction algorithm
+- [theine](https://github.com/Yiling-J/theine-go) - High-performance in-memory cache
+- [tinylfu](https://github.com/vmihailenco/go-tinylfu) - TinyLFU admission policy
+- [ttlcache](https://github.com/jellydator/ttlcache) - Cache with per-item TTL support
+
 ## Installation
 
 ```bash
@@ -72,23 +90,7 @@ Multi-threaded throughput (QPS) with 75% reads / 25% writes using Zipf workload.
 
 Memory overhead per cached item, measured in isolated processes for accuracy.
 
-## Supported Caches
 
-- [sfcache](https://github.com/codeGROOVE-dev/sfcache) - High-performance cache with W-TinyLFU
-- [otter](https://github.com/maypok86/otter) - High-performance cache with S3-FIFO eviction
-- [theine](https://github.com/Yiling-J/theine-go) - High-performance in-memory cache
-- [ttlcache](https://github.com/jellydator/ttlcache) - Cache with per-item TTL support
-- [ristretto](https://github.com/dgraph-io/ristretto) - Fast concurrent cache from Dgraph
-- [tinylfu](https://github.com/vmihailenco/go-tinylfu) - TinyLFU admission policy
-- [sieve](https://github.com/scalalang2/golang-fifo) - SIEVE eviction algorithm
-- [s3-fifo](https://github.com/scalalang2/golang-fifo) - S3-FIFO eviction algorithm
-- [freelru-shard](https://github.com/elastic/go-freelru) - GC-friendly sharded LRU from Elastic
-- [freelru-sync](https://github.com/elastic/go-freelru) - GC-friendly synced LRU from Elastic
-- [freecache](https://github.com/coocood/freecache) - Zero GC cache
-- [2q](https://github.com/hashicorp/golang-lru) - Two-queue cache
-- [s4lru](https://github.com/dgryski/go-s4lru) - Segmented LRU
-- [clock](https://github.com/Code-Hex/go-generics-cache) - CLOCK eviction algorithm
-- [lru](https://github.com/hashicorp/golang-lru) - HashiCorp's LRU implementation
 
 ## Development
 

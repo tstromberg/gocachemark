@@ -1,4 +1,4 @@
-.PHONY: all build run hitrate latency throughput html clean lint deps
+.PHONY: all build run hitrate latency throughput html clean lint deps update
 
 all: build
 
@@ -29,3 +29,9 @@ lint:
 
 deps:
 	go mod tidy
+
+update:
+	@for dir in $$(find . -name go.mod -exec dirname {} \;); do \
+		echo "Updating $$dir..."; \
+		cd "$$dir" && go get -u ./... && go mod tidy && cd - > /dev/null; \
+	done

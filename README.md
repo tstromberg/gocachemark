@@ -2,6 +2,17 @@
 
 A modern (2025) benchmarking tool for comparing Go cache implementations.
 
+## Latest Results (December 8, 2025)
+
+[![Latest benchmark results](latest/screenshot-small.png)](https://htmlpreview.github.io/?https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.html)
+
+**Top 3 performers:**
+1. **sfcache** - 100 points
+2. **otter** - 60 points
+3. **freelru-shard** - 35 points
+
+View the [full benchmark report](https://htmlpreview.github.io/?https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.html) for detailed results across hit rate, latency, throughput, and memory benchmarks.
+
 ## Installation
 
 ```bash

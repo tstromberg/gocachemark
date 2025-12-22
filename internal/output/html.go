@@ -58,17 +58,17 @@ type HitRateData struct {
 
 // LatencyData holds latency benchmark data.
 type LatencyData struct {
-	Results    []benchmark.LatencyResult
-	IntResults []benchmark.IntLatencyResult
+	Results         []benchmark.LatencyResult
+	IntResults      []benchmark.IntLatencyResult
+	GetOrSetResults []benchmark.GetOrSetLatencyResult
 }
 
 // ThroughputData holds throughput benchmark data.
 type ThroughputData struct {
-	Results          []benchmark.ThroughputResult
-	IntResults       []benchmark.ThroughputResult
-	GetOrSetResults  []benchmark.ThroughputResult
-	IntGetOrSetResults []benchmark.ThroughputResult
-	Threads          []int
+	Results         []benchmark.ThroughputResult
+	IntResults      []benchmark.ThroughputResult
+	GetOrSetResults []benchmark.ThroughputResult
+	Threads         []int
 }
 
 func joinStrings(s []string, sep string) string {
@@ -352,47 +352,22 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		}
 		return max
 	},
-	"maxGetOrSetLatency": func(results []benchmark.LatencyResult) float64 {
+	"maxGetOrSetLatency": func(results []benchmark.GetOrSetLatencyResult) float64 {
 		max := 0.0
 		for _, r := range results {
-			if r.HasGetOrSet && r.GetOrSetNsOp > max {
-				max = r.GetOrSetNsOp
+			if r.NsOp > max {
+				max = r.NsOp
 			}
 		}
 		return max
 	},
-	"maxIntGetOrSetLatency": func(results []benchmark.IntLatencyResult) float64 {
-		max := 0.0
-		for _, r := range results {
-			if r.HasGetOrSet && r.GetOrSetNsOp > max {
-				max = r.GetOrSetNsOp
-			}
-		}
-		return max
-	},
-	"filterGetOrSet": func(results []benchmark.LatencyResult) []benchmark.LatencyResult {
-		filtered := make([]benchmark.LatencyResult, 0)
-		for _, r := range results {
-			if r.HasGetOrSet {
-				filtered = append(filtered, r)
-			}
-		}
-		sort.Slice(filtered, func(i, j int) bool {
-			return filtered[i].GetOrSetNsOp < filtered[j].GetOrSetNsOp
+	"sortGetOrSet": func(results []benchmark.GetOrSetLatencyResult) []benchmark.GetOrSetLatencyResult {
+		sorted := make([]benchmark.GetOrSetLatencyResult, len(results))
+		copy(sorted, results)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].NsOp < sorted[j].NsOp
 		})
-		return filtered
-	},
-	"filterIntGetOrSet": func(results []benchmark.IntLatencyResult) []benchmark.IntLatencyResult {
-		filtered := make([]benchmark.IntLatencyResult, 0)
-		for _, r := range results {
-			if r.HasGetOrSet {
-				filtered = append(filtered, r)
-			}
-		}
-		sort.Slice(filtered, func(i, j int) bool {
-			return filtered[i].GetOrSetNsOp < filtered[j].GetOrSetNsOp
-		})
-		return filtered
+		return sorted
 	},
 	"maxQPS": func(results []benchmark.ThroughputResult, threads int) float64 {
 		max := 0.0
@@ -1101,9 +1076,9 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     </table>
     {{end}}
 
-    {{$getOrSetResults := filterGetOrSet .Latency.Results}}
-    {{if $getOrSetResults}}
-    {{$maxGetOrSet := maxGetOrSetLatency .Latency.Results}}
+    {{if .Latency.GetOrSetResults}}
+    {{$getOrSetResults := sortGetOrSet .Latency.GetOrSetResults}}
+    {{$maxGetOrSet := maxGetOrSetLatency .Latency.GetOrSetResults}}
     <h3 style="margin-top: 40px;">String Keys - GetOrSet</h3>
     <p class="suite-description">GetOrSet is an atomic operation that gets a value if it exists, or sets it if it doesn't. Only caches that support this operation are shown.</p>
 
@@ -1120,41 +1095,12 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         {{range $getOrSetResults}}
         <tr>
             <td>{{.Name}}</td>
-            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetOrSetNsOp $maxGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .GetOrSetNsOp}}</span></div></td>
-            <td>{{.GetOrSetAllocs}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .NsOp $maxGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .NsOp}}</span></div></td>
+            <td>{{.Allocs}}</td>
         </tr>
         {{end}}
         </tbody>
     </table>
-    {{end}}
-
-    {{if .Latency.IntResults}}
-    {{$intGetOrSetResults := filterIntGetOrSet .Latency.IntResults}}
-    {{if $intGetOrSetResults}}
-    {{$maxIntGetOrSet := maxIntGetOrSetLatency .Latency.IntResults}}
-    <h3 style="margin-top: 40px;">Int Keys - GetOrSet</h3>
-    <p class="suite-description">GetOrSet latency for integer keys. Only caches that support this operation are shown.</p>
-
-    <h4>GetOrSet Results</h4>
-    <table>
-        <thead>
-        <tr>
-            <th class="sortable">Cache</th>
-            <th class="sortable">GetOrSet (ns)</th>
-            <th class="sortable">GetOrSet allocs</th>
-        </tr>
-        </thead>
-        <tbody>
-        {{range $intGetOrSetResults}}
-        <tr>
-            <td>{{.Name}}</td>
-            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetOrSetNsOp $maxIntGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .GetOrSetNsOp}}</span></div></td>
-            <td>{{.GetOrSetAllocs}}</td>
-        </tr>
-        {{end}}
-        </tbody>
-    </table>
-    {{end}}
     {{end}}
 
     </div>

@@ -26,23 +26,41 @@ var cacheSizes []int
 // threadCounts holds the thread counts for throughput benchmarks.
 var threadCounts []int
 
+// validSuites lists all available benchmark suites.
+var validSuites = []string{"hitrate", "latency", "throughput", "memory"}
+
+// suiteFilter holds which suites to run.
+var suiteFilter map[string]bool
+
 func main() {
-	hitRate := flag.Bool("hitrate", false, "Run hit rate benchmarks (CDN, Meta, Zipf traces)")
-	latency := flag.Bool("latency", false, "Run single-threaded latency benchmarks (ns/op)")
-	throughput := flag.Bool("throughput", false, "Run multi-threaded throughput benchmarks (QPS)")
-	memory := flag.Bool("memory", false, "Run memory overhead benchmarks (isolated processes)")
-	all := flag.Bool("all", false, "Run all benchmarks")
+	showHelp := flag.Bool("help", false, "Show help message")
+	suites := flag.String("suites", "all", "Comma-separated list of benchmark suites: hitrate,latency,throughput,memory (default: all)")
 	htmlOut := flag.String("html", "", "Output results to HTML file (e.g., results.html)")
 	openHTML := flag.Bool("open", false, "Open HTML report in web browser after generation")
 	caches := flag.String("caches", "", "Comma-separated list of caches to benchmark (default: all)")
-	tests := flag.String("tests", "", "Comma-separated list of hit rate tests: cdn,meta,zipf (default: all)")
+	tests := flag.String("tests", "", "Comma-separated list of tests to run across suites (default: all)")
 	sizes := flag.String("sizes", "", "Comma-separated cache sizes in K (e.g., 16,32,64,128,256)")
 	threads := flag.String("threads", "", "Comma-separated thread counts for throughput (e.g., 8,16)")
 	flag.Parse()
 
-	if !*hitRate && !*latency && !*throughput && !*memory && !*all {
+	if *showHelp {
 		printUsage()
 		os.Exit(0)
+	}
+
+	// Parse suites
+	suiteFilter = make(map[string]bool)
+	if *suites == "all" || *suites == "" {
+		for _, s := range validSuites {
+			suiteFilter[s] = true
+		}
+	} else {
+		for _, s := range strings.Split(*suites, ",") {
+			s = strings.TrimSpace(strings.ToLower(s))
+			if s != "" {
+				suiteFilter[s] = true
+			}
+		}
 	}
 
 	// Apply cache filter
@@ -92,19 +110,19 @@ func main() {
 
 	var results output.Results
 
-	if *hitRate || *all {
+	if suiteFilter["hitrate"] {
 		results.HitRate = runHitRateBenchmarks()
 	}
 
-	if *latency || *all {
+	if suiteFilter["latency"] {
 		results.Latency = runLatencyBenchmarks()
 	}
 
-	if *throughput || *all {
+	if suiteFilter["throughput"] {
 		results.Throughput = runThroughputBenchmarks()
 	}
 
-	if *memory || *all {
+	if suiteFilter["memory"] {
 		results.Memory = runMemoryBenchmarks()
 	}
 
@@ -136,29 +154,46 @@ func printUsage() {
 	fmt.Println("gocachemark - Compare Go cache implementations")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  gocachemark -hitrate     Run hit rate benchmarks")
-	fmt.Println("  gocachemark -latency     Run single-threaded latency (ns/op)")
-	fmt.Println("  gocachemark -throughput  Run multi-threaded throughput (QPS)")
-	fmt.Println("  gocachemark -memory      Run memory overhead benchmarks")
-	fmt.Println("  gocachemark -all         Run all benchmarks")
+	fmt.Println("  gocachemark                      Run all benchmarks (default)")
+	fmt.Println("  gocachemark -suites hitrate      Run only hit rate benchmarks")
+	fmt.Println("  gocachemark -suites latency,memory  Run latency and memory benchmarks")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -html <file>     Output results to HTML file (default: temp dir)")
+	fmt.Println("  -suites <list>   Comma-separated suites: hitrate,latency,throughput,memory (default: all)")
+	fmt.Println("  -tests <list>    Comma-separated tests to run across suites (default: all)")
 	fmt.Println("  -caches <list>   Comma-separated caches to benchmark (default: all)")
-	fmt.Println("  -tests <list>    Comma-separated tests to run (default: all)")
 	fmt.Println("  -sizes <list>    Comma-separated cache sizes in K (default: 16,32,64,128,256)")
 	fmt.Println("  -threads <list>  Comma-separated thread counts for throughput (default: 1,8,16,32)")
+	fmt.Println("  -html <file>     Output results to HTML file (default: temp dir)")
+	fmt.Println("  -open            Open HTML report in web browser after generation")
 	fmt.Println()
-	fmt.Println("Available tests:")
-	fmt.Println("  Hit rate:    cdn, meta, zipf, twitter, wikipedia")
-	fmt.Println("  Latency:     string, int")
-	fmt.Println("  Throughput:  string-throughput, int-throughput, getorset-throughput, int-getorset-throughput")
-	fmt.Println("  Memory:      memory")
+	fmt.Println("Available suites and tests:")
+	fmt.Println()
+	fmt.Println("  hitrate - Hit rate benchmarks (cache efficiency)")
+	fmt.Println("    cdn                     CDN access trace")
+	fmt.Println("    meta                    Meta/Facebook KV trace")
+	fmt.Println("    zipf                    Synthetic Zipf distribution")
+	fmt.Println("    twitter                 Twitter cache trace")
+	fmt.Println("    wikipedia               Wikipedia access trace")
+	fmt.Println()
+	fmt.Println("  latency - Single-threaded latency benchmarks (ns/op)")
+	fmt.Println("    string                  String key Get/Set operations")
+	fmt.Println("    int                     Int key Get/Set operations")
+	fmt.Println("    getorset                GetOrSet operations (URL keys)")
+	fmt.Println()
+	fmt.Println("  throughput - Multi-threaded throughput benchmarks (QPS)")
+	fmt.Println("    string-throughput       String keys, Zipf workload")
+	fmt.Println("    int-throughput          Int keys, Zipf workload")
+	fmt.Println("    getorset-throughput     GetOrSet operations (URL keys)")
+	fmt.Println()
+	fmt.Println("  memory - Memory overhead benchmarks (isolated processes)")
+	fmt.Println("    memory                  Per-item memory overhead")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  gocachemark -latency -tests int -caches otter,sfcache")
-	fmt.Println("  gocachemark -hitrate -tests cdn,zipf")
-	fmt.Println("  gocachemark -all -caches otter,theine -html results.html")
+	fmt.Println("  gocachemark -suites latency -tests int -caches otter,sfcache")
+	fmt.Println("  gocachemark -suites hitrate -tests cdn,zipf")
+	fmt.Println("  gocachemark -suites throughput,memory -tests string-throughput,memory")
+	fmt.Println("  gocachemark -caches otter,theine -html results.html")
 	fmt.Println()
 	fmt.Println("Available caches:")
 	for _, name := range cache.AvailableNames() {
@@ -166,21 +201,42 @@ func printUsage() {
 	}
 }
 
+const lineWidth = 80
+
 func printHeader() {
-	fmt.Println("=" + strings.Repeat("=", 79))
-	fmt.Println("                       Go Cache Implementation Benchmark")
-	fmt.Println("=" + strings.Repeat("=", 79))
+	fmt.Println("gocachemark")
 	fmt.Println()
-	fmt.Printf("Comparing %d cache implementations.\n", len(cache.AllNames()))
-	fmt.Printf("Cache sizes: ")
-	for i, size := range cacheSizes {
-		if i > 0 {
-			fmt.Printf(", ")
+
+	// Build config summary
+	var suitesRun []string
+	for _, s := range validSuites {
+		if suiteFilter[s] {
+			suitesRun = append(suitesRun, s)
 		}
-		fmt.Printf("%dK", size/1024)
 	}
+
+	fmt.Printf("  caches: %d\n", len(cache.AllNames()))
+	fmt.Printf("  suites: %s\n", strings.Join(suitesRun, ", "))
+
+	var sizeStrs []string
+	for _, size := range cacheSizes {
+		sizeStrs = append(sizeStrs, fmt.Sprintf("%dK", size/1024))
+	}
+	fmt.Printf("  sizes:  %s\n", strings.Join(sizeStrs, ", "))
 	fmt.Println()
-	fmt.Println()
+}
+
+func printSuite(name, description string) {
+	header := fmt.Sprintf("%s: %s ", name, description)
+	padding := lineWidth - len(header)
+	if padding < 4 {
+		padding = 4
+	}
+	fmt.Printf("%s%s\n\n", header, strings.Repeat("─", padding))
+}
+
+func printTest(name, description string) {
+	fmt.Printf("  [%s] %s\n\n", name, description)
 }
 
 func shouldRunTest(name string) bool {
@@ -194,62 +250,53 @@ func runHitRateBenchmarks() *output.HitRateData {
 	sizes := cacheSizes
 	data := &output.HitRateData{Sizes: sizes}
 
-	fmt.Println("-" + strings.Repeat("-", 79))
-	fmt.Println("HIT RATE BENCHMARKS")
-	fmt.Println("-" + strings.Repeat("-", 79))
-	fmt.Println()
+	printSuite("hitrate", "cache efficiency")
 
-	// CDN Trace
 	if shouldRunTest("cdn") {
-		fmt.Printf("### [cdn] %s\n\n", trace.CDNInfo())
+		printTest("cdn", trace.CDNInfo())
 		cdnResults, err := benchmark.RunCDNHitRate(sizes)
 		if err != nil {
-			fmt.Printf("Error: %v\n\n", err)
+			fmt.Printf("  error: %v\n\n", err)
 		} else {
 			data.CDN = cdnResults
 			printHitRateTable(cdnResults, sizes)
 		}
 	}
 
-	// Meta Trace
 	if shouldRunTest("meta") {
-		fmt.Printf("### [meta] %s\n\n", trace.MetaInfo())
+		printTest("meta", trace.MetaInfo())
 		metaResults, err := benchmark.RunMetaHitRate(sizes)
 		if err != nil {
-			fmt.Printf("Error: %v\n\n", err)
+			fmt.Printf("  error: %v\n\n", err)
 		} else {
 			data.Meta = metaResults
 			printHitRateTable(metaResults, sizes)
 		}
 	}
 
-	// Zipf synthetic
 	if shouldRunTest("zipf") {
-		fmt.Println("### [zipf] Zipf synthetic trace (alpha=0.8, 2M ops, 100K keyspace)")
-		fmt.Println()
+		printTest("zipf", "Zipf synthetic (alpha=0.8, 2M ops, 100K keyspace)")
 		zipfResults := benchmark.RunZipfHitRate(sizes, 100_000, 2_000_000, 0.8)
 		data.Zipf = zipfResults
 		printHitRateTable(zipfResults, sizes)
 	}
 
-	// Twitter Trace
 	if shouldRunTest("twitter") {
-		fmt.Printf("### [twitter] %s\n\n", trace.TwitterInfo())
+		printTest("twitter", trace.TwitterInfo())
 		twitterResults, err := benchmark.RunTwitterHitRate(sizes)
 		if err != nil {
-			fmt.Printf("Error: %v\n\n", err)
+			fmt.Printf("  error: %v\n\n", err)
 		} else {
 			data.Twitter = twitterResults
 			printHitRateTable(twitterResults, sizes)
 		}
 	}
 
-	// Wikipedia Trace
 	if shouldRunTest("wikipedia") {
-		fmt.Printf("### [wikipedia] %s\n\n", trace.WikipediaInfo())
+		printTest("wikipedia", trace.WikipediaInfo())
 		wikipediaResults, err := benchmark.RunWikipediaHitRate(sizes)
 		if err != nil {
-			fmt.Printf("Error: %v\n\n", err)
+			fmt.Printf("  error: %v\n\n", err)
 		} else {
 			data.Wikipedia = wikipediaResults
 			printHitRateTable(wikipediaResults, sizes)
@@ -274,26 +321,25 @@ func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
 		return avgHitRate(sorted[i], sizes) > avgHitRate(sorted[j], sizes)
 	})
 
-	fmt.Print("| Cache         |")
+	fmt.Print("  | Cache         |")
 	for _, size := range sizes {
 		fmt.Printf(" %5dK |", size/1024)
 	}
 	fmt.Println("    Avg |")
 
-	fmt.Print("|---------------|")
+	fmt.Print("  |---------------|")
 	for range sizes {
 		fmt.Print("--------|")
 	}
 	fmt.Println("--------|")
 
 	for _, r := range sorted {
-		fmt.Printf("| %-13s |", r.Name)
+		fmt.Printf("  | %-13s |", r.Name)
 		for _, size := range sizes {
 			fmt.Printf(" %5.2f%% |", r.Rates[size])
 		}
 		fmt.Printf(" %5.2f%% |\n", avgHitRate(r, sizes))
 	}
-	fmt.Println()
 
 	if len(sorted) >= 2 {
 		best := sorted[0]
@@ -301,22 +347,18 @@ func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
 		bestAvg := avgHitRate(best, sizes)
 		secondAvg := avgHitRate(second, sizes)
 		pct := (bestAvg - secondAvg) / secondAvg * 100
-		fmt.Printf("Best: %s (%.2f%% avg, %.2f%% better than %s)\n\n", best.Name, bestAvg, pct, second.Name)
+		fmt.Printf("\n  winner: %s (%.2f%% avg, +%.2f%% vs %s)\n", best.Name, bestAvg, pct, second.Name)
 	}
+	fmt.Println()
 }
 
 func runLatencyBenchmarks() *output.LatencyData {
-	fmt.Println("-" + strings.Repeat("-", 99))
-	fmt.Println("LATENCY BENCHMARKS (Single-Threaded)")
-	fmt.Println("-" + strings.Repeat("-", 99))
-	fmt.Println()
+	printSuite("latency", "single-threaded (ns/op)")
 
 	data := &output.LatencyData{}
 
-	// String key benchmarks
 	if shouldRunTest("string") {
-		fmt.Println("### [string] String Keys")
-		fmt.Println()
+		printTest("string", "string key Get/Set operations")
 		results := benchmark.RunLatency()
 		data.Results = results
 
@@ -330,125 +372,85 @@ func runLatencyBenchmarks() *output.LatencyData {
 			return avgLatency(sorted[i]) < avgLatency(sorted[j])
 		})
 
-		fmt.Println("| Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |")
-		fmt.Println("|---------------|--------|-----------|--------|-----------|-------------|----------------|--------|")
+		fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |")
+		fmt.Println("  |---------------|--------|-----------|--------|-----------|-------------|----------------|--------|")
 
 		for _, r := range sorted {
-			fmt.Printf("| %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
+			fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
 				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
 		}
-		fmt.Println()
 
 		if len(sorted) >= 2 {
 			best := sorted[0]
 			second := sorted[1]
 			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
-			fmt.Printf("Best: %s (%.0f ns avg, %.1f%% faster than %s)\n\n", best.Name, avgLatency(best), pct, second.Name)
+			fmt.Printf("\n  winner: %s (%.0f ns avg, +%.1f%% vs %s)\n", best.Name, avgLatency(best), pct, second.Name)
 		}
+		fmt.Println()
+	}
 
-		// GetOrSet latency (separate table)
-		getOrSetResults := make([]benchmark.LatencyResult, 0)
-		for _, r := range results {
-			if r.HasGetOrSet {
-				getOrSetResults = append(getOrSetResults, r)
-			}
-		}
+	if shouldRunTest("getorset") {
+		printTest("getorset", "GetOrSet operations (URL keys)")
+		results := benchmark.RunGetOrSetLatency()
+		data.GetOrSetResults = results
 
-		if len(getOrSetResults) > 0 {
-			fmt.Println("### [string-getorset] String Keys - GetOrSet")
+		if len(results) == 0 {
+			fmt.Println("  (no caches with GetOrSet support)")
 			fmt.Println()
-
-			getOrSetSorted := make([]benchmark.LatencyResult, len(getOrSetResults))
-			copy(getOrSetSorted, getOrSetResults)
-			sort.Slice(getOrSetSorted, func(i, j int) bool {
-				return getOrSetSorted[i].GetOrSetNsOp < getOrSetSorted[j].GetOrSetNsOp
+		} else {
+			sorted := make([]benchmark.GetOrSetLatencyResult, len(results))
+			copy(sorted, results)
+			sort.Slice(sorted, func(i, j int) bool {
+				return sorted[i].NsOp < sorted[j].NsOp
 			})
 
-			fmt.Println("| Cache         | GetOrSet ns | GetOrSet alloc | Avg ns |")
-			fmt.Println("|---------------|-------------|----------------|--------|")
+			fmt.Println("  | Cache         | GetOrSet ns | GetOrSet alloc |")
+			fmt.Println("  |---------------|-------------|----------------|")
 
-			for _, r := range getOrSetSorted {
-				fmt.Printf("| %-13s | %11.0f | %14d | %6.0f |\n",
-					r.Name, r.GetOrSetNsOp, r.GetOrSetAllocs, r.GetOrSetNsOp)
+			for _, r := range sorted {
+				fmt.Printf("  | %-13s | %11.0f | %14d |\n", r.Name, r.NsOp, r.Allocs)
+			}
+
+			if len(sorted) >= 2 {
+				best := sorted[0]
+				second := sorted[1]
+				pct := (second.NsOp - best.NsOp) / best.NsOp * 100
+				fmt.Printf("\n  winner: %s (%.0f ns, +%.1f%% vs %s)\n", best.Name, best.NsOp, pct, second.Name)
 			}
 			fmt.Println()
-
-			if len(getOrSetSorted) >= 2 {
-				best := getOrSetSorted[0]
-				second := getOrSetSorted[1]
-				pct := (second.GetOrSetNsOp - best.GetOrSetNsOp) / best.GetOrSetNsOp * 100
-				fmt.Printf("Best: %s (%.0f ns, %.1f%% faster than %s)\n\n", best.Name, best.GetOrSetNsOp, pct, second.Name)
-			}
 		}
 	}
 
-	// Int key benchmarks
 	if shouldRunTest("int") {
-		fmt.Println("### [int] Int Keys")
-		fmt.Println()
-		intResults := benchmark.RunIntLatency()
-		data.IntResults = intResults
+		printTest("int", "int key Get/Set operations")
+		results := benchmark.RunIntLatency()
+		data.IntResults = results
 
-		avgIntLatency := func(r benchmark.IntLatencyResult) float64 {
+		avgLatency := func(r benchmark.IntLatencyResult) float64 {
 			return (r.GetNsOp + r.SetNsOp) / 2
 		}
 
-		intSorted := make([]benchmark.IntLatencyResult, len(intResults))
-		copy(intSorted, intResults)
-		sort.Slice(intSorted, func(i, j int) bool {
-			return avgIntLatency(intSorted[i]) < avgIntLatency(intSorted[j])
+		sorted := make([]benchmark.IntLatencyResult, len(results))
+		copy(sorted, results)
+		sort.Slice(sorted, func(i, j int) bool {
+			return avgLatency(sorted[i]) < avgLatency(sorted[j])
 		})
 
-		fmt.Println("| Cache         | Get ns | Get alloc | Set ns | Set alloc | Avg ns |")
-		fmt.Println("|---------------|--------|-----------|--------|-----------|--------|")
+		fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | Avg ns |")
+		fmt.Println("  |---------------|--------|-----------|--------|-----------|--------|")
 
-		for _, r := range intSorted {
-			fmt.Printf("| %-13s | %6.0f | %9d | %6.0f | %9d | %6.0f |\n",
-				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, avgIntLatency(r))
+		for _, r := range sorted {
+			fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %6.0f |\n",
+				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, avgLatency(r))
+		}
+
+		if len(sorted) >= 2 {
+			best := sorted[0]
+			second := sorted[1]
+			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
+			fmt.Printf("\n  winner: %s (%.0f ns avg, +%.1f%% vs %s)\n", best.Name, avgLatency(best), pct, second.Name)
 		}
 		fmt.Println()
-
-		if len(intSorted) >= 2 {
-			best := intSorted[0]
-			second := intSorted[1]
-			pct := (avgIntLatency(second) - avgIntLatency(best)) / avgIntLatency(best) * 100
-			fmt.Printf("Best: %s (%.0f ns avg, %.1f%% faster than %s)\n\n", best.Name, avgIntLatency(best), pct, second.Name)
-		}
-
-		// GetOrSet latency (separate table)
-		intGetOrSetResults := make([]benchmark.IntLatencyResult, 0)
-		for _, r := range intResults {
-			if r.HasGetOrSet {
-				intGetOrSetResults = append(intGetOrSetResults, r)
-			}
-		}
-
-		if len(intGetOrSetResults) > 0 {
-			fmt.Println("### [int-getorset] Int Keys - GetOrSet")
-			fmt.Println()
-
-			intGetOrSetSorted := make([]benchmark.IntLatencyResult, len(intGetOrSetResults))
-			copy(intGetOrSetSorted, intGetOrSetResults)
-			sort.Slice(intGetOrSetSorted, func(i, j int) bool {
-				return intGetOrSetSorted[i].GetOrSetNsOp < intGetOrSetSorted[j].GetOrSetNsOp
-			})
-
-			fmt.Println("| Cache         | GetOrSet ns | GetOrSet alloc | Avg ns |")
-			fmt.Println("|---------------|-------------|----------------|--------|")
-
-			for _, r := range intGetOrSetSorted {
-				fmt.Printf("| %-13s | %11.0f | %14d | %6.0f |\n",
-					r.Name, r.GetOrSetNsOp, r.GetOrSetAllocs, r.GetOrSetNsOp)
-			}
-			fmt.Println()
-
-			if len(intGetOrSetSorted) >= 2 {
-				best := intGetOrSetSorted[0]
-				second := intGetOrSetSorted[1]
-				pct := (second.GetOrSetNsOp - best.GetOrSetNsOp) / best.GetOrSetNsOp * 100
-				fmt.Printf("Best: %s (%.0f ns, %.1f%% faster than %s)\n\n", best.Name, best.GetOrSetNsOp, pct, second.Name)
-			}
-		}
 	}
 
 	return data
@@ -457,10 +459,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 func runThroughputBenchmarks() *output.ThroughputData {
 	threads := threadCounts
 
-	fmt.Println("-" + strings.Repeat("-", 79))
-	fmt.Println("THROUGHPUT BENCHMARKS (Multi-Threaded)")
-	fmt.Println("-" + strings.Repeat("-", 79))
-	fmt.Println()
+	printSuite("throughput", "multi-threaded (QPS)")
 
 	data := &output.ThroughputData{Threads: threads}
 
@@ -479,20 +478,20 @@ func runThroughputBenchmarks() *output.ThroughputData {
 			return avgQPS(sorted[i]) > avgQPS(sorted[j])
 		})
 
-		fmt.Print("| Cache         |")
+		fmt.Print("  | Cache         |")
 		for _, t := range threads {
 			fmt.Printf(" %2dT       |", t)
 		}
 		fmt.Println("       Avg |")
 
-		fmt.Print("|---------------|")
+		fmt.Print("  |---------------|")
 		for range threads {
 			fmt.Print("-----------|")
 		}
 		fmt.Println("-----------|")
 
 		for _, r := range sorted {
-			fmt.Printf("| %-13s |", r.Name)
+			fmt.Printf("  | %-13s |", r.Name)
 			for _, t := range threads {
 				qps := r.QPS[t]
 				if qps >= 1_000_000 {
@@ -508,7 +507,6 @@ func runThroughputBenchmarks() *output.ThroughputData {
 				fmt.Printf(" %6.0fK   |\n", avg/1_000)
 			}
 		}
-		fmt.Println()
 
 		if len(sorted) >= 2 {
 			best := sorted[0]
@@ -516,47 +514,31 @@ func runThroughputBenchmarks() *output.ThroughputData {
 			bestAvg := avgQPS(best)
 			secondAvg := avgQPS(second)
 			pct := (bestAvg - secondAvg) / secondAvg * 100
-			fmt.Printf("Best: %s (%.1f%% faster than %s on average)\n\n", best.Name, pct, second.Name)
+			fmt.Printf("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
 		}
+		fmt.Println()
 	}
 
-	// String key throughput
 	if shouldRunTest("string-throughput") {
-		fmt.Println("### [string-throughput] String keys, Zipf workload, 75% reads / 25% writes")
-		fmt.Println()
+		printTest("string-throughput", "string keys, Zipf, 75% read / 25% write")
 		data.Results = benchmark.RunThroughput(threads)
 		printThroughputTable(data.Results)
 	}
 
-	// Int key throughput
 	if shouldRunTest("int-throughput") {
-		fmt.Println("### [int-throughput] Int keys, Zipf workload, 75% reads / 25% writes")
-		fmt.Println()
+		printTest("int-throughput", "int keys, Zipf, 75% read / 25% write")
 		data.IntResults = benchmark.RunIntThroughput(threads)
 		printThroughputTable(data.IntResults)
 	}
 
-	// GetOrSet throughput
 	if shouldRunTest("getorset-throughput") {
-		fmt.Println("### [getorset-throughput] String keys, Zipf workload, GetOrSet operations")
-		fmt.Println()
+		printTest("getorset-throughput", "GetOrSet operations (URL keys)")
 		data.GetOrSetResults = benchmark.RunGetOrSetThroughput(threads)
 		if len(data.GetOrSetResults) > 0 {
 			printThroughputTable(data.GetOrSetResults)
 		} else {
-			fmt.Println("No caches with GetOrSet support found.\n")
-		}
-	}
-
-	// Int GetOrSet throughput
-	if shouldRunTest("int-getorset-throughput") {
-		fmt.Println("### [int-getorset-throughput] Int keys, Zipf workload, GetOrSet operations")
-		fmt.Println()
-		data.IntGetOrSetResults = benchmark.RunIntGetOrSetThroughput(threads)
-		if len(data.IntGetOrSetResults) > 0 {
-			printThroughputTable(data.IntGetOrSetResults)
-		} else {
-			fmt.Println("No caches with GetOrSet support found.\n")
+			fmt.Println("  (no caches with GetOrSet support)")
+			fmt.Println()
 		}
 	}
 
@@ -567,39 +549,36 @@ func runMemoryBenchmarks() *output.MemoryData {
 	capacity := benchmark.DefaultMemoryCapacity
 	valSize := benchmark.DefaultValueSize
 
-	fmt.Println("-" + strings.Repeat("-", 79))
-	fmt.Println("MEMORY BENCHMARKS (Isolated Processes)")
-	fmt.Println("-" + strings.Repeat("-", 79))
-	fmt.Println()
+	printSuite("memory", "overhead per item (isolated processes)")
 
 	if !shouldRunTest("memory") {
 		return nil
 	}
 
-	fmt.Printf("### [memory] %d items, %d byte values, 3 passes for admission\n\n", capacity, valSize)
+	printTest("memory", fmt.Sprintf("%d items, %d byte values, 3 passes", capacity, valSize))
 
 	results, err := benchmark.RunMemory(capacity, valSize)
 	if err != nil {
-		fmt.Printf("Error: %v\n\n", err)
+		fmt.Printf("  error: %v\n\n", err)
 		return nil
 	}
 
-	fmt.Println("| Cache         | Items Stored | Memory (MB) | Overhead vs map (bytes/item) |")
-	fmt.Println("|---------------|--------------|-------------|------------------------------|")
+	fmt.Println("  | Cache         | Items Stored | Memory (MB) | Overhead (bytes/item) |")
+	fmt.Println("  |---------------|--------------|-------------|-----------------------|")
 
 	for _, r := range results {
 		mb := float64(r.Bytes) / 1024 / 1024
-		fmt.Printf("| %-13s | %12d | %9.2f MB | %28d |\n",
+		fmt.Printf("  | %-13s | %12d | %11.2f | %21d |\n",
 			r.Name, r.Items, mb, r.BytesPerItem)
 	}
-	fmt.Println()
 
 	if len(results) >= 2 {
 		best := results[0]
 		second := results[1]
 		savings := float64(second.Bytes-best.Bytes) / float64(second.Bytes) * 100
-		fmt.Printf("Most efficient: %s (%.1f%% less memory than %s)\n\n", best.Name, savings, second.Name)
+		fmt.Printf("\n  winner: %s (%.1f%% less memory vs %s)\n", best.Name, savings, second.Name)
 	}
+	fmt.Println()
 
 	return &output.MemoryData{Results: results, Capacity: capacity, ValSize: valSize}
 }
@@ -715,41 +694,17 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 			assignPoints(names)
 		}
 		// GetOrSet latency rankings
-		if results.Latency.Results != nil && len(results.Latency.Results) > 0 {
-			getOrSetResults := make([]benchmark.LatencyResult, 0)
-			for _, r := range results.Latency.Results {
-				if r.HasGetOrSet {
-					getOrSetResults = append(getOrSetResults, r)
-				}
+		if len(results.Latency.GetOrSetResults) > 0 {
+			sorted := make([]benchmark.GetOrSetLatencyResult, len(results.Latency.GetOrSetResults))
+			copy(sorted, results.Latency.GetOrSetResults)
+			sort.Slice(sorted, func(i, j int) bool {
+				return sorted[i].NsOp < sorted[j].NsOp
+			})
+			var names []string
+			for _, r := range sorted {
+				names = append(names, r.Name)
 			}
-			if len(getOrSetResults) > 0 {
-				sort.Slice(getOrSetResults, func(i, j int) bool {
-					return getOrSetResults[i].GetOrSetNsOp < getOrSetResults[j].GetOrSetNsOp
-				})
-				var names []string
-				for _, r := range getOrSetResults {
-					names = append(names, r.Name)
-				}
-				assignPoints(names)
-			}
-		}
-		if results.Latency.IntResults != nil && len(results.Latency.IntResults) > 0 {
-			intGetOrSetResults := make([]benchmark.IntLatencyResult, 0)
-			for _, r := range results.Latency.IntResults {
-				if r.HasGetOrSet {
-					intGetOrSetResults = append(intGetOrSetResults, r)
-				}
-			}
-			if len(intGetOrSetResults) > 0 {
-				sort.Slice(intGetOrSetResults, func(i, j int) bool {
-					return intGetOrSetResults[i].GetOrSetNsOp < intGetOrSetResults[j].GetOrSetNsOp
-				})
-				var names []string
-				for _, r := range intGetOrSetResults {
-					names = append(names, r.Name)
-				}
-				assignPoints(names)
-			}
+			assignPoints(names)
 		}
 	}
 
@@ -790,18 +745,6 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 		if results.Throughput.GetOrSetResults != nil && len(results.Throughput.GetOrSetResults) > 0 {
 			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.GetOrSetResults))
 			copy(sorted, results.Throughput.GetOrSetResults)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgQPS(sorted[i]) > avgQPS(sorted[j])
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
-			}
-			assignPoints(names)
-		}
-		if results.Throughput.IntGetOrSetResults != nil && len(results.Throughput.IntGetOrSetResults) > 0 {
-			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.IntGetOrSetResults))
-			copy(sorted, results.Throughput.IntGetOrSetResults)
 			sort.Slice(sorted, func(i, j int) bool {
 				return avgQPS(sorted[i]) > avgQPS(sorted[j])
 			})
@@ -857,17 +800,11 @@ func printOverallRanking(rankings []output.Ranking) {
 		return
 	}
 
-	// Print top 3
-	fmt.Println("=" + strings.Repeat("=", 79))
-	fmt.Println("OVERALL RANKING (ranked voting across all tests)")
-	fmt.Println("=" + strings.Repeat("=", 79))
-	fmt.Println()
+	printSuite("summary", "ranked voting across all tests")
 
-	medals := []string{"🥇", "🥈", "🥉"}
 	for i := 0; i < len(rankings) && i < 3; i++ {
 		r := rankings[i]
-		medal := medals[i]
-		fmt.Printf("%s #%d: %s (%.0f points)\n", medal, r.Rank, r.Name, r.Score)
+		fmt.Printf("  #%d  %s (%.0f points)\n", r.Rank, r.Name, r.Score)
 	}
 	fmt.Println()
 }

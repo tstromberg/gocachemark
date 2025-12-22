@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -9,16 +10,13 @@ import (
 
 // LatencyResult holds single-threaded latency results for a cache.
 type LatencyResult struct {
-	Name            string
-	GetNsOp         float64 // nanoseconds per Get operation
-	SetNsOp         float64 // nanoseconds per Set operation (no eviction)
-	SetEvictNsOp    float64 // nanoseconds per Set with eviction (20x keyspace)
-	GetOrSetNsOp    float64 // nanoseconds per GetOrSet operation
-	GetAllocs       int64   // allocations per Get
-	SetAllocs       int64   // allocations per Set
-	SetEvictAllocs  int64   // allocations per Set with eviction
-	GetOrSetAllocs  int64   // allocations per GetOrSet
-	HasGetOrSet     bool    // whether cache supports GetOrSet
+	Name           string
+	GetNsOp        float64 // nanoseconds per Get operation
+	SetNsOp        float64 // nanoseconds per Set operation (no eviction)
+	SetEvictNsOp   float64 // nanoseconds per Set with eviction (20x keyspace)
+	GetAllocs      int64   // allocations per Get
+	SetAllocs      int64   // allocations per Set
+	SetEvictAllocs int64   // allocations per Set with eviction
 }
 
 // IntLatencyResult holds single-threaded latency results for int-keyed caches.
@@ -27,21 +25,52 @@ type IntLatencyResult struct {
 	GetNsOp        float64
 	SetNsOp        float64
 	SetEvictNsOp   float64
-	GetOrSetNsOp   float64
 	GetAllocs      int64
 	SetAllocs      int64
 	SetEvictAllocs int64
-	GetOrSetAllocs int64
-	HasGetOrSet    bool
+}
+
+// GetOrSetLatencyResult holds single-threaded GetOrSet latency results.
+type GetOrSetLatencyResult struct {
+	Name   string
+	NsOp   float64
+	Allocs int64
 }
 
 const latencyCacheSize = 10000
+
+// generateURLKeys creates URL-like cache keys for realistic benchmarking.
+// Uses a fixed seed for reproducibility.
+func generateURLKeys(n int) []string {
+	// Common Wikipedia article path segments for realistic URLs
+	segments := []string{
+		"Main_Page", "United_States", "World_War_II", "India", "United_Kingdom",
+		"Canada", "Australia", "Germany", "France", "Japan", "China", "Russia",
+		"Brazil", "Italy", "Spain", "Mexico", "South_Korea", "Indonesia",
+		"New_York_City", "London", "Paris", "Tokyo", "Los_Angeles", "Chicago",
+		"Houston", "Phoenix", "Philadelphia", "San_Antonio", "San_Diego",
+		"Albert_Einstein", "Isaac_Newton", "Charles_Darwin", "Marie_Curie",
+		"Leonardo_da_Vinci", "William_Shakespeare", "Abraham_Lincoln",
+		"George_Washington", "Napoleon", "Julius_Caesar", "Cleopatra",
+		"The_Beatles", "Elvis_Presley", "Michael_Jackson", "Madonna",
+		"Python_(programming_language)", "JavaScript", "Java_(programming_language)",
+		"C_(programming_language)", "Go_(programming_language)", "Rust_(programming_language)",
+		"Linux", "Microsoft_Windows", "MacOS", "Android_(operating_system)", "IOS",
+	}
+
+	keys := make([]string, n)
+	for i := range n {
+		// Deterministic selection based on index
+		seg := segments[i%len(segments)]
+		keys[i] = fmt.Sprintf("https://en.wikipedia.org/wiki/%s_%d", seg, i)
+	}
+	return keys
+}
 
 // RunLatency benchmarks single-threaded Get/Set latency for all caches (string keys).
 func RunLatency() []LatencyResult {
 	results := make([]LatencyResult, 0, len(cache.All()))
 
-	// Pre-generate keys once for all benchmarks
 	keys := make([]string, latencyCacheSize)
 	for i := range latencyCacheSize {
 		keys[i] = strconv.Itoa(i)
@@ -54,7 +83,6 @@ func RunLatency() []LatencyResult {
 	for _, factory := range cache.All() {
 		c := factory(latencyCacheSize)
 		name := c.Name()
-		_, hasGetOrSet := c.(cache.GetOrSetCache)
 		c.Close()
 
 		getResult := testing.Benchmark(func(b *testing.B) {
@@ -67,7 +95,7 @@ func RunLatency() []LatencyResult {
 			benchSetEvict(b, factory, evictKeys)
 		})
 
-		result := LatencyResult{
+		results = append(results, LatencyResult{
 			Name:           name,
 			GetNsOp:        float64(getResult.NsPerOp()),
 			SetNsOp:        float64(setResult.NsPerOp()),
@@ -75,18 +103,38 @@ func RunLatency() []LatencyResult {
 			GetAllocs:      getResult.AllocsPerOp(),
 			SetAllocs:      setResult.AllocsPerOp(),
 			SetEvictAllocs: setEvictResult.AllocsPerOp(),
-			HasGetOrSet:    hasGetOrSet,
+		})
+	}
+
+	return results
+}
+
+// RunGetOrSetLatency benchmarks single-threaded GetOrSet latency for caches that support it.
+// Uses URL-like keys to simulate realistic cache workloads.
+func RunGetOrSetLatency() []GetOrSetLatencyResult {
+	var results []GetOrSetLatencyResult
+
+	keys := generateURLKeys(latencyCacheSize)
+
+	for _, factory := range cache.All() {
+		c := factory(latencyCacheSize)
+		name := c.Name()
+		_, hasGetOrSet := c.(cache.GetOrSetCache)
+		c.Close()
+
+		if !hasGetOrSet {
+			continue
 		}
 
-		if hasGetOrSet {
-			getOrSetResult := testing.Benchmark(func(b *testing.B) {
-				benchGetOrSet(b, factory, keys)
-			})
-			result.GetOrSetNsOp = float64(getOrSetResult.NsPerOp())
-			result.GetOrSetAllocs = getOrSetResult.AllocsPerOp()
-		}
+		result := testing.Benchmark(func(b *testing.B) {
+			benchGetOrSet(b, factory, keys)
+		})
 
-		results = append(results, result)
+		results = append(results, GetOrSetLatencyResult{
+			Name:   name,
+			NsOp:   float64(result.NsPerOp()),
+			Allocs: result.AllocsPerOp(),
+		})
 	}
 
 	return results
@@ -96,7 +144,6 @@ func RunLatency() []LatencyResult {
 func RunIntLatency() []IntLatencyResult {
 	results := make([]IntLatencyResult, 0, len(cache.AllInt()))
 
-	// Pre-generate keys once for all benchmarks
 	keys := make([]int, latencyCacheSize)
 	for i := range latencyCacheSize {
 		keys[i] = i
@@ -109,7 +156,6 @@ func RunIntLatency() []IntLatencyResult {
 	for _, factory := range cache.AllInt() {
 		c := factory(latencyCacheSize)
 		name := c.Name()
-		_, hasGetOrSet := c.(cache.IntGetOrSetCache)
 		c.Close()
 
 		getResult := testing.Benchmark(func(b *testing.B) {
@@ -122,7 +168,7 @@ func RunIntLatency() []IntLatencyResult {
 			benchIntSetEvict(b, factory, evictKeys)
 		})
 
-		result := IntLatencyResult{
+		results = append(results, IntLatencyResult{
 			Name:           name,
 			GetNsOp:        float64(getResult.NsPerOp()),
 			SetNsOp:        float64(setResult.NsPerOp()),
@@ -130,18 +176,7 @@ func RunIntLatency() []IntLatencyResult {
 			GetAllocs:      getResult.AllocsPerOp(),
 			SetAllocs:      setResult.AllocsPerOp(),
 			SetEvictAllocs: setEvictResult.AllocsPerOp(),
-			HasGetOrSet:    hasGetOrSet,
-		}
-
-		if hasGetOrSet {
-			getOrSetResult := testing.Benchmark(func(b *testing.B) {
-				benchIntGetOrSet(b, factory, keys)
-			})
-			result.GetOrSetNsOp = float64(getOrSetResult.NsPerOp())
-			result.GetOrSetAllocs = getOrSetResult.AllocsPerOp()
-		}
-
-		results = append(results, result)
+		})
 	}
 
 	return results
@@ -237,22 +272,3 @@ func benchGetOrSet(b *testing.B, factory cache.Factory, keys []string) {
 	}
 }
 
-func benchIntGetOrSet(b *testing.B, factory cache.IntFactory, keys []int) {
-	c := factory(latencyCacheSize)
-	defer c.Close()
-
-	gosCache, ok := c.(cache.IntGetOrSetCache)
-	if !ok {
-		b.Skip("cache does not implement GetOrSet")
-	}
-
-	// Pre-populate half the keys to test both hit and miss cases
-	for i := 0; i < latencyCacheSize/2; i++ {
-		gosCache.Set(keys[i], keys[i])
-	}
-
-	b.ResetTimer()
-	for i := range b.N {
-		gosCache.GetOrSet(keys[i%latencyCacheSize], keys[i%latencyCacheSize])
-	}
-}

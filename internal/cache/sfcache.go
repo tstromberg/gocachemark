@@ -27,9 +27,7 @@ func (c *sfcacheCache) Close() {
 }
 
 func (c *sfcacheCache) GetOrSet(key, value string) string {
-	result, _ := c.c.GetSet(key, func() (string, error) {
-		return value, nil
-	})
+	result, _ := c.c.SetIfAbsent(key, value)
 	return result
 }
 
@@ -58,8 +56,6 @@ func (c *sfcacheIntCache) Close() {
 }
 
 func (c *sfcacheIntCache) GetOrSet(key, value int) int {
-	result, _ := c.c.GetSet(key, func() (int, error) {
-		return value, nil
-	})
+	result, _ := c.c.SetIfAbsent(key, value)
 	return result
 }

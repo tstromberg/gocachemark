@@ -21,7 +21,7 @@ type ThroughputResult struct {
 var DefaultThreadCounts = []int{1, 8, 16, 32}
 
 const (
-	throughputCacheSize    = 10000
+	throughputCacheSize    = 32768 // 32K - realistic cache size for multi-threaded benchmarks
 	throughputWorkloadSize = 1_000_000
 	throughputAlpha        = 0.8
 	benchmarkDuration      = 1 * time.Second

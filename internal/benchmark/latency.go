@@ -37,7 +37,7 @@ type GetOrSetLatencyResult struct {
 	Allocs int64
 }
 
-const latencyCacheSize = 10000
+const latencyCacheSize = 16384 // Power of 2 for better hash distribution
 
 // generateURLKeys creates URL-like cache keys for realistic benchmarking.
 // Uses a fixed seed for reproducibility.
@@ -190,9 +190,10 @@ func benchGet(b *testing.B, factory cache.Factory, keys []string) {
 		c.Set(k, k)
 	}
 
+	n := len(keys)
 	b.ResetTimer()
 	for i := range b.N {
-		c.Get(keys[i%latencyCacheSize])
+		c.Get(keys[i%n])
 	}
 }
 
@@ -200,9 +201,16 @@ func benchSet(b *testing.B, factory cache.Factory, keys []string) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
 
+	// Pre-populate to ensure we're measuring updates, not inserts.
+	for _, k := range keys {
+		c.Set(k, k)
+	}
+
+	n := len(keys)
 	b.ResetTimer()
 	for i := range b.N {
-		c.Set(keys[i%latencyCacheSize], keys[i%latencyCacheSize])
+		k := keys[i%n]
+		c.Set(k, k)
 	}
 }
 
@@ -210,10 +218,18 @@ func benchSetEvict(b *testing.B, factory cache.Factory, keys []string) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
 
-	keySpace := len(keys)
+	// Pre-fill cache to capacity, then measure eviction with new keys.
+	for i := 0; i < latencyCacheSize; i++ {
+		c.Set(keys[i], keys[i])
+	}
+
+	// Use keys beyond the pre-filled set to force eviction on every Set.
+	evictKeys := keys[latencyCacheSize:]
+	n := len(evictKeys)
 	b.ResetTimer()
 	for i := range b.N {
-		c.Set(keys[i%keySpace], keys[i%keySpace])
+		k := evictKeys[i%n]
+		c.Set(k, k)
 	}
 }
 
@@ -225,9 +241,10 @@ func benchIntGet(b *testing.B, factory cache.IntFactory, keys []int) {
 		c.Set(k, k)
 	}
 
+	n := len(keys)
 	b.ResetTimer()
 	for i := range b.N {
-		c.Get(keys[i%latencyCacheSize])
+		c.Get(keys[i%n])
 	}
 }
 
@@ -235,9 +252,16 @@ func benchIntSet(b *testing.B, factory cache.IntFactory, keys []int) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
 
+	// Pre-populate to ensure we're measuring updates, not inserts.
+	for _, k := range keys {
+		c.Set(k, k)
+	}
+
+	n := len(keys)
 	b.ResetTimer()
 	for i := range b.N {
-		c.Set(keys[i%latencyCacheSize], keys[i%latencyCacheSize])
+		k := keys[i%n]
+		c.Set(k, k)
 	}
 }
 
@@ -245,10 +269,18 @@ func benchIntSetEvict(b *testing.B, factory cache.IntFactory, keys []int) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
 
-	keySpace := len(keys)
+	// Pre-fill cache to capacity.
+	for i := 0; i < latencyCacheSize; i++ {
+		c.Set(keys[i], keys[i])
+	}
+
+	// Use keys beyond the pre-filled set to force eviction.
+	evictKeys := keys[latencyCacheSize:]
+	n := len(evictKeys)
 	b.ResetTimer()
 	for i := range b.N {
-		c.Set(keys[i%keySpace], keys[i%keySpace])
+		k := evictKeys[i%n]
+		c.Set(k, k)
 	}
 }
 
@@ -266,9 +298,11 @@ func benchGetOrSet(b *testing.B, factory cache.Factory, keys []string) {
 		gosCache.Set(keys[i], keys[i])
 	}
 
+	n := len(keys)
 	b.ResetTimer()
 	for i := range b.N {
-		gosCache.GetOrSet(keys[i%latencyCacheSize], keys[i%latencyCacheSize])
+		k := keys[i%n]
+		gosCache.GetOrSet(k, k)
 	}
 }
 

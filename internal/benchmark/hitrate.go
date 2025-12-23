@@ -32,6 +32,12 @@ const (
 	TwitterEntrySize = 110
 	// Wikipedia trace: avg key ~10 bytes, value=key, ~32 bytes overhead
 	WikipediaEntrySize = 55
+	// Thesios block trace: key is ~72 bytes (hash:offset), value=key, ~32 bytes overhead
+	ThesiosBlockEntrySize = 180
+	// Thesios file trace: key is 64 bytes (hash only), value=key, ~32 bytes overhead
+	ThesiosFileEntrySize = 160
+	// IBM Docker trace: key is ~40 bytes (URI), value=key, ~32 bytes overhead
+	IBMDockerEntrySize = 115
 )
 
 // RunCDNHitRate benchmarks hit rates using the CDN production trace.
@@ -216,6 +222,123 @@ func RunWikipediaHitRate(sizes []int) ([]HitRateResult, error) {
 }
 
 func runWikipediaTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+	c := factory(cacheSize)
+	defer c.Close()
+
+	var hits, misses int64
+	for _, key := range ops {
+		if _, ok := c.Get(key); ok {
+			hits++
+		} else {
+			misses++
+			c.Set(key, key)
+		}
+	}
+	return float64(hits) / float64(hits+misses) * 100
+}
+
+// RunThesiosBlockHitRate benchmarks hit rates using the Google Thesios I/O block trace.
+func RunThesiosBlockHitRate(sizes []int) ([]HitRateResult, error) {
+	ops, err := trace.LoadThesiosBlockTrace()
+	if err != nil {
+		return nil, fmt.Errorf("load Thesios block trace: %w", err)
+	}
+
+	results := make([]HitRateResult, 0, len(cache.All()))
+	for _, factory := range cache.AllWithEntrySize(ThesiosBlockEntrySize) {
+		c := factory(sizes[0])
+		name := c.Name()
+		c.Close()
+
+		rates := make(map[int]float64)
+		for _, size := range sizes {
+			rates[size] = runThesiosBlockTrace(factory, ops, size)
+		}
+		results = append(results, HitRateResult{Name: name, Rates: rates})
+	}
+
+	return results, nil
+}
+
+func runThesiosBlockTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+	c := factory(cacheSize)
+	defer c.Close()
+
+	var hits, misses int64
+	for _, key := range ops {
+		if _, ok := c.Get(key); ok {
+			hits++
+		} else {
+			misses++
+			c.Set(key, key)
+		}
+	}
+	return float64(hits) / float64(hits+misses) * 100
+}
+
+// RunThesiosFileHitRate benchmarks hit rates using the Google Thesios I/O file trace.
+func RunThesiosFileHitRate(sizes []int) ([]HitRateResult, error) {
+	ops, err := trace.LoadThesiosFileTrace()
+	if err != nil {
+		return nil, fmt.Errorf("load Thesios file trace: %w", err)
+	}
+
+	results := make([]HitRateResult, 0, len(cache.All()))
+	for _, factory := range cache.AllWithEntrySize(ThesiosFileEntrySize) {
+		c := factory(sizes[0])
+		name := c.Name()
+		c.Close()
+
+		rates := make(map[int]float64)
+		for _, size := range sizes {
+			rates[size] = runThesiosFileTrace(factory, ops, size)
+		}
+		results = append(results, HitRateResult{Name: name, Rates: rates})
+	}
+
+	return results, nil
+}
+
+func runThesiosFileTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+	c := factory(cacheSize)
+	defer c.Close()
+
+	var hits, misses int64
+	for _, key := range ops {
+		if _, ok := c.Get(key); ok {
+			hits++
+		} else {
+			misses++
+			c.Set(key, key)
+		}
+	}
+	return float64(hits) / float64(hits+misses) * 100
+}
+
+// RunIBMDockerHitRate benchmarks hit rates using the IBM Docker Registry trace.
+func RunIBMDockerHitRate(sizes []int) ([]HitRateResult, error) {
+	ops, err := trace.LoadIBMDockerTrace()
+	if err != nil {
+		return nil, fmt.Errorf("load IBM Docker trace: %w", err)
+	}
+
+	results := make([]HitRateResult, 0, len(cache.All()))
+	for _, factory := range cache.AllWithEntrySize(IBMDockerEntrySize) {
+		c := factory(sizes[0])
+		name := c.Name()
+		c.Close()
+
+		rates := make(map[int]float64)
+		for _, size := range sizes {
+			rates[size] = runIBMDockerTrace(factory, ops, size)
+		}
+		results = append(results, HitRateResult{Name: name, Rates: rates})
+	}
+
+	return results, nil
+}
+
+func runIBMDockerTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
 	c := factory(cacheSize)
 	defer c.Close()
 

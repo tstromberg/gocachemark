@@ -13,7 +13,7 @@ import (
 
 	"github.com/Code-Hex/go-generics-cache/policy/clock"
 	"github.com/Yiling-J/theine-go"
-	"github.com/codeGROOVE-dev/sfcache"
+	"github.com/codeGROOVE-dev/multicache"
 	"github.com/coocood/freecache"
 	"github.com/dgraph-io/ristretto"
 	"github.com/dgryski/go-s4lru"
@@ -60,8 +60,8 @@ func runBenchmark(name string, capacity, valSize int) int {
 	switch name {
 	case "baseline":
 		return runBaseline(capacity, valSize)
-	case "sfcache":
-		return runSFCache(capacity, valSize)
+	case "multicache":
+		return runMulticache(capacity, valSize)
 	case "otter":
 		return runOtter(capacity, valSize)
 	case "theine":
@@ -105,8 +105,8 @@ func runBaseline(capacity, valSize int) int {
 	return len(m)
 }
 
-func runSFCache(capacity, valSize int) int {
-	c := sfcache.New[string, []byte](sfcache.Size(capacity))
+func runMulticache(capacity, valSize int) int {
+	c := multicache.New[string, []byte](multicache.Size(capacity))
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))

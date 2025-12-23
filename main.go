@@ -175,6 +175,9 @@ func printUsage() {
 	fmt.Println("    zipf                    Synthetic Zipf distribution")
 	fmt.Println("    twitter                 Twitter cache trace")
 	fmt.Println("    wikipedia               Wikipedia access trace")
+	fmt.Println("    thesios-block           Google Thesios I/O block trace")
+	fmt.Println("    thesios-file            Google Thesios I/O file trace")
+	fmt.Println("    ibm-docker              IBM Docker Registry trace")
 	fmt.Println()
 	fmt.Println("  latency - Single-threaded latency benchmarks (ns/op)")
 	fmt.Println("    string                  String key Get/Set operations")
@@ -190,7 +193,7 @@ func printUsage() {
 	fmt.Println("    memory                  Per-item memory overhead")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  gocachemark -suites latency -tests int -caches otter,sfcache")
+	fmt.Println("  gocachemark -suites latency -tests int -caches otter,multicache")
 	fmt.Println("  gocachemark -suites hitrate -tests cdn,zipf")
 	fmt.Println("  gocachemark -suites throughput,memory -tests string-throughput,memory")
 	fmt.Println("  gocachemark -caches otter,theine -html results.html")
@@ -303,6 +306,39 @@ func runHitRateBenchmarks() *output.HitRateData {
 		}
 	}
 
+	if shouldRunTest("thesios-block") {
+		printTest("thesios-block", trace.ThesiosBlockInfo())
+		thesiosBlockResults, err := benchmark.RunThesiosBlockHitRate(sizes)
+		if err != nil {
+			fmt.Printf("  error: %v\n\n", err)
+		} else {
+			data.ThesiosBlock = thesiosBlockResults
+			printHitRateTable(thesiosBlockResults, sizes)
+		}
+	}
+
+	if shouldRunTest("thesios-file") {
+		printTest("thesios-file", trace.ThesiosFileInfo())
+		thesiosFileResults, err := benchmark.RunThesiosFileHitRate(sizes)
+		if err != nil {
+			fmt.Printf("  error: %v\n\n", err)
+		} else {
+			data.ThesiosFile = thesiosFileResults
+			printHitRateTable(thesiosFileResults, sizes)
+		}
+	}
+
+	if shouldRunTest("ibm-docker") {
+		printTest("ibm-docker", trace.IBMDockerInfo())
+		ibmDockerResults, err := benchmark.RunIBMDockerHitRate(sizes)
+		if err != nil {
+			fmt.Printf("  error: %v\n\n", err)
+		} else {
+			data.IBMDocker = ibmDockerResults
+			printHitRateTable(ibmDockerResults, sizes)
+		}
+	}
+
 	return data
 }
 
@@ -384,7 +420,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 			best := sorted[0]
 			second := sorted[1]
 			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
-			fmt.Printf("\n  winner: %s (%.0f ns avg, +%.1f%% vs %s)\n", best.Name, avgLatency(best), pct, second.Name)
+			fmt.Printf("\n  winner: %s (%.0f ns avg, %s is %.1f%% slower)\n", best.Name, avgLatency(best), second.Name, pct)
 		}
 		fmt.Println()
 	}
@@ -415,7 +451,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 				best := sorted[0]
 				second := sorted[1]
 				pct := (second.NsOp - best.NsOp) / best.NsOp * 100
-				fmt.Printf("\n  winner: %s (%.0f ns, +%.1f%% vs %s)\n", best.Name, best.NsOp, pct, second.Name)
+				fmt.Printf("\n  winner: %s (%.0f ns, %s is %.1f%% slower)\n", best.Name, best.NsOp, second.Name, pct)
 			}
 			fmt.Println()
 		}
@@ -448,7 +484,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 			best := sorted[0]
 			second := sorted[1]
 			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
-			fmt.Printf("\n  winner: %s (%.0f ns avg, +%.1f%% vs %s)\n", best.Name, avgLatency(best), pct, second.Name)
+			fmt.Printf("\n  winner: %s (%.0f ns avg, %s is %.1f%% slower)\n", best.Name, avgLatency(best), second.Name, pct)
 		}
 		fmt.Println()
 	}
@@ -599,63 +635,28 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 
 	// Hit rate benchmarks - rank by average hit rate (higher is better)
 	if results.HitRate != nil {
-		if results.HitRate.CDN != nil && len(results.HitRate.CDN) > 0 {
-			sorted := make([]benchmark.HitRateResult, len(results.HitRate.CDN))
-			copy(sorted, results.HitRate.CDN)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
-			}
-			assignPoints(names)
+		hitRateBenchmarks := [][]benchmark.HitRateResult{
+			results.HitRate.CDN,
+			results.HitRate.Meta,
+			results.HitRate.Zipf,
+			results.HitRate.Twitter,
+			results.HitRate.Wikipedia,
+			results.HitRate.ThesiosBlock,
+			results.HitRate.ThesiosFile,
+			results.HitRate.IBMDocker,
 		}
-		if results.HitRate.Meta != nil && len(results.HitRate.Meta) > 0 {
-			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Meta))
-			copy(sorted, results.HitRate.Meta)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
+		for _, data := range hitRateBenchmarks {
+			if len(data) == 0 {
+				continue
 			}
-			assignPoints(names)
-		}
-		if results.HitRate.Zipf != nil && len(results.HitRate.Zipf) > 0 {
-			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Zipf))
-			copy(sorted, results.HitRate.Zipf)
+			sorted := make([]benchmark.HitRateResult, len(data))
+			copy(sorted, data)
 			sort.Slice(sorted, func(i, j int) bool {
 				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
 			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
-			}
-			assignPoints(names)
-		}
-		if results.HitRate.Twitter != nil && len(results.HitRate.Twitter) > 0 {
-			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Twitter))
-			copy(sorted, results.HitRate.Twitter)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
-			}
-			assignPoints(names)
-		}
-		if results.HitRate.Wikipedia != nil && len(results.HitRate.Wikipedia) > 0 {
-			sorted := make([]benchmark.HitRateResult, len(results.HitRate.Wikipedia))
-			copy(sorted, results.HitRate.Wikipedia)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
+			names := make([]string, len(sorted))
+			for i, r := range sorted {
+				names[i] = r.Name
 			}
 			assignPoints(names)
 		}
@@ -717,50 +718,33 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 			}
 			return sum / float64(len(r.QPS))
 		}
-
-		if results.Throughput.Results != nil && len(results.Throughput.Results) > 0 {
-			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.Results))
-			copy(sorted, results.Throughput.Results)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgQPS(sorted[i]) > avgQPS(sorted[j])
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
-			}
-			assignPoints(names)
+		throughputBenchmarks := [][]benchmark.ThroughputResult{
+			results.Throughput.Results,
+			results.Throughput.IntResults,
+			results.Throughput.GetOrSetResults,
 		}
-		if results.Throughput.IntResults != nil && len(results.Throughput.IntResults) > 0 {
-			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.IntResults))
-			copy(sorted, results.Throughput.IntResults)
-			sort.Slice(sorted, func(i, j int) bool {
-				return avgQPS(sorted[i]) > avgQPS(sorted[j])
-			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
+		for _, data := range throughputBenchmarks {
+			if len(data) == 0 {
+				continue
 			}
-			assignPoints(names)
-		}
-		if results.Throughput.GetOrSetResults != nil && len(results.Throughput.GetOrSetResults) > 0 {
-			sorted := make([]benchmark.ThroughputResult, len(results.Throughput.GetOrSetResults))
-			copy(sorted, results.Throughput.GetOrSetResults)
+			sorted := make([]benchmark.ThroughputResult, len(data))
+			copy(sorted, data)
 			sort.Slice(sorted, func(i, j int) bool {
 				return avgQPS(sorted[i]) > avgQPS(sorted[j])
 			})
-			var names []string
-			for _, r := range sorted {
-				names = append(names, r.Name)
+			names := make([]string, len(sorted))
+			for i, r := range sorted {
+				names[i] = r.Name
 			}
 			assignPoints(names)
 		}
 	}
 
 	// Memory benchmark - rank by memory usage (lower is better)
-	if results.Memory != nil && results.Memory.Results != nil && len(results.Memory.Results) > 0 {
-		var names []string
-		for _, r := range results.Memory.Results {
-			names = append(names, r.Name)
+	if results.Memory != nil && len(results.Memory.Results) > 0 {
+		names := make([]string, len(results.Memory.Results))
+		for i, r := range results.Memory.Results {
+			names[i] = r.Name
 		}
 		assignPoints(names)
 	}

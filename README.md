@@ -7,7 +7,7 @@ A modern (2025) benchmarking tool for comparing Go cache implementations.
 [![Latest benchmark results](latest/screenshot-small.png)](https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.pdf)
 
 **Top 3 performers:**
-1. **sfcache** - 100 points
+1. **multicache** - 100 points
 2. **otter** - 60 points
 3. **freelru-shard** - 35 points
 
@@ -25,7 +25,7 @@ View the [full benchmark report](https://github.com/tstromberg/gocachemark/blob/
 - [ristretto](https://github.com/dgraph-io/ristretto) - Fast concurrent cache from Dgraph
 - [s3-fifo](https://github.com/scalalang2/golang-fifo) - S3-FIFO eviction algorithm
 - [s4lru](https://github.com/dgryski/go-s4lru) - Segmented LRU
-- [sfcache](https://github.com/codeGROOVE-dev/sfcache) - High-performance cache with W-TinyLFU
+- [multicache](https://github.com/codeGROOVE-dev/multicache) - High-performance cache with W-TinyLFU
 - [sieve](https://github.com/scalalang2/golang-fifo) - SIEVE eviction algorithm
 - [theine](https://github.com/Yiling-J/theine-go) - High-performance in-memory cache
 - [tinylfu](https://github.com/vmihailenco/go-tinylfu) - TinyLFU admission policy
@@ -56,15 +56,15 @@ gocachemark -all         # Run all benchmarks
 
 ### Available Tests
 
-- **Hit rate**: cdn, meta, zipf
-- **Latency**: string, int
-- **Throughput**: string-throughput, int-throughput
+- **Hit rate**: cdn, meta, zipf, twitter, wikipedia, thesios-block, thesios-file, ibm-docker
+- **Latency**: string, int, getorset
+- **Throughput**: string-throughput, int-throughput, getorset-throughput
 - **Memory**: memory
 
 ### Examples
 
 ```bash
-gocachemark -latency -tests int -caches otter,sfcache
+gocachemark -latency -tests int -caches otter,multicache
 gocachemark -hitrate -tests cdn,zipf
 gocachemark -all -caches otter,theine -html results.html -open
 ```
@@ -73,10 +73,16 @@ gocachemark -all -caches otter,theine -html results.html -open
 
 ### Hit Rate
 
-Measures cache hit rates using:
-- **CDN trace** - Real production CDN access patterns
-- **Meta trace** - Meta's KVCache production trace
-- **Zipf synthetic** - Synthetic workload with Zipf distribution (alpha=0.8, 20:1 ops-to-key ratio)
+Measures cache hit rates using production traces and synthetic workloads:
+
+- **CDN trace** - Real production CDN access patterns ([libCacheSim](https://github.com/1a1a11a/libCacheSim))
+- **Meta trace** - Meta's KVCache production trace ([CacheLib](https://cachelib.org/))
+- **Twitter trace** - Twitter cache cluster production trace ([twitter/cache-trace](https://github.com/twitter/cache-trace))
+- **Wikipedia trace** - Wikipedia CDN upload trace ([libCacheSim](https://github.com/1a1a11a/libCacheSim))
+- **Zipf synthetic** - Synthetic workload with Zipf distribution (alpha=0.8)
+- **Google Thesios I/O block trace** - Google storage I/O block-level patterns (400K reads, 322K unique blocks). Citation: [Tectonic-Shift](https://dl.acm.org/doi/10.1145/3620666.3651337) (SOSP '24)
+- **Google Thesios I/O file trace** - Google storage I/O file-level patterns (400K reads, 46K unique files). Citation: [Tectonic-Shift](https://dl.acm.org/doi/10.1145/3620666.3651337) (SOSP '24)
+- **IBM Docker Registry trace** - IBM container registry access patterns (725K GETs, 121K unique URIs). Citation: [Improving Docker Registry Design Based on Production Workload Analysis](https://www.usenix.org/conference/fast18/presentation/anwar) (FAST '18)
 
 ### Latency
 

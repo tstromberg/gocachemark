@@ -19,14 +19,15 @@ func NewClock(capacity int) Cache {
 
 func (c *clockCache) Get(key string) (string, bool) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.c.Get(key)
+	v, ok := c.c.Get(key)
+	c.mu.Unlock()
+	return v, ok
 }
 
 func (c *clockCache) Set(key, value string) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.c.Set(key, value)
+	c.mu.Unlock()
 }
 
 func (c *clockCache) Name() string {

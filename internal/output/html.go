@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tstromberg/gocachemark/internal/benchmark"
@@ -48,12 +49,15 @@ type MemoryData struct {
 
 // HitRateData holds hit rate benchmark data.
 type HitRateData struct {
-	CDN       []benchmark.HitRateResult
-	Meta      []benchmark.HitRateResult
-	Zipf      []benchmark.HitRateResult
-	Twitter   []benchmark.HitRateResult
-	Wikipedia []benchmark.HitRateResult
-	Sizes     []int
+	CDN          []benchmark.HitRateResult
+	Meta         []benchmark.HitRateResult
+	Zipf         []benchmark.HitRateResult
+	Twitter      []benchmark.HitRateResult
+	Wikipedia    []benchmark.HitRateResult
+	ThesiosBlock []benchmark.HitRateResult
+	ThesiosFile  []benchmark.HitRateResult
+	IBMDocker    []benchmark.HitRateResult
+	Sizes        []int
 }
 
 // LatencyData holds latency benchmark data.
@@ -71,21 +75,16 @@ type ThroughputData struct {
 	Threads         []int
 }
 
-func joinStrings(s []string, sep string) string {
-	result := ""
-	for i, v := range s {
-		if i > 0 {
-			result += sep
-		}
-		result += v
-	}
-	return result
-}
-
 // WriteHTML writes benchmark results to an HTML file with bar charts.
 func WriteHTML(filename string, results Results, commandLine string) error {
 	results.Timestamp = time.Now().Format("2006-01-02 15:04:05 MST")
-	results.MachineInfo = GetMachineInfo(commandLine)
+	results.MachineInfo = MachineInfo{
+		OS:          runtime.GOOS,
+		Arch:        runtime.GOARCH,
+		NumCPU:      runtime.NumCPU(),
+		GoVersion:   runtime.Version(),
+		CommandLine: commandLine,
+	}
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -94,17 +93,6 @@ func WriteHTML(filename string, results Results, commandLine string) error {
 	defer f.Close()
 
 	return htmlTemplate.Execute(f, results)
-}
-
-// GetMachineInfo collects information about the benchmark environment.
-func GetMachineInfo(commandLine string) MachineInfo {
-	return MachineInfo{
-		OS:          runtime.GOOS,
-		Arch:        runtime.GOARCH,
-		NumCPU:      runtime.NumCPU(),
-		GoVersion:   runtime.Version(),
-		CommandLine: commandLine,
-	}
 }
 
 var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
@@ -181,11 +169,11 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 		for i, s := range sizes {
 			labels[i] = fmt.Sprintf("\"%dK\"", s/1024)
 		}
-		return template.JS("[" + joinStrings(labels, ",") + "]")
+		return template.JS("[" + strings.Join(labels, ",") + "]")
 	},
 	"hitRateDatasets": func(results []benchmark.HitRateResult, sizes []int) template.JS {
 		cacheColors := map[string]string{
-			"sfcache":        "#2E7D32",
+			"multicache":     "#2E7D32",
 			"otter":          "#1976D2",
 			"theine":         "#D32F2F",
 			"ristretto":      "#7B1FA2",
@@ -216,21 +204,21 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 			}
 			datasets = append(datasets, fmt.Sprintf(
 				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}`,
-				r.Name, joinStrings(data, ","), color, color,
+				r.Name, strings.Join(data, ","), color, color,
 			))
 		}
-		return template.JS("[" + joinStrings(datasets, ",") + "]")
+		return template.JS("[" + strings.Join(datasets, ",") + "]")
 	},
 	"threadLabels": func(threads []int) template.JS {
 		labels := make([]string, len(threads))
 		for i, t := range threads {
 			labels[i] = fmt.Sprintf("\"%dT\"", t)
 		}
-		return template.JS("[" + joinStrings(labels, ",") + "]")
+		return template.JS("[" + strings.Join(labels, ",") + "]")
 	},
 	"throughputDatasets": func(results []benchmark.ThroughputResult, threads []int) template.JS {
 		cacheColors := map[string]string{
-			"sfcache":        "#2E7D32",
+			"multicache":     "#2E7D32",
 			"otter":          "#1976D2",
 			"theine":         "#D32F2F",
 			"ristretto":      "#7B1FA2",
@@ -261,10 +249,10 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 			}
 			datasets = append(datasets, fmt.Sprintf(
 				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}`,
-				r.Name, joinStrings(data, ","), color, color,
+				r.Name, strings.Join(data, ","), color, color,
 			))
 		}
-		return template.JS("[" + joinStrings(datasets, ",") + "]")
+		return template.JS("[" + strings.Join(datasets, ",") + "]")
 	},
 	"pct": func(f float64) string { return fmt.Sprintf("%.2f", f) },
 	"ns":  func(f float64) string { return fmt.Sprintf("%.1f", f) },
@@ -855,7 +843,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.CDN}}
     <h3>CDN Production Trace</h3>
-    <p class="suite-description">2M operations, ~768K unique keys</p>
+    <p class="suite-description">2M operations, ~768K unique keys. Source: <a href="https://github.com/1a1a11a/libCacheSim">libCacheSim</a></p>
     <div class="line-chart-container">
         <canvas id="cdnChart"></canvas>
     </div>
@@ -882,7 +870,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Meta}}
     <h3 style="margin-top: 50px;">Meta KVCache Production Trace</h3>
-    <p class="suite-description">5M operations</p>
+    <p class="suite-description">5M operations. Source: <a href="https://cachelib.org/">CacheLib</a></p>
     <div class="line-chart-container">
         <canvas id="metaChart"></canvas>
     </div>
@@ -936,7 +924,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Twitter}}
     <h3 style="margin-top: 50px;">Twitter Production Cache Trace</h3>
-    <p class="suite-description">2M operations, cluster001+cluster052</p>
+    <p class="suite-description">2M operations, cluster001+cluster052. Source: <a href="https://github.com/twitter/cache-trace">Twitter Cache Trace</a></p>
     <div class="line-chart-container">
         <canvas id="twitterChart"></canvas>
     </div>
@@ -963,7 +951,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 
     {{if .HitRate.Wikipedia}}
     <h3 style="margin-top: 50px;">Wikipedia CDN Upload Trace</h3>
-    <p class="suite-description">2M operations, upload.wikimedia.org</p>
+    <p class="suite-description">2M operations, upload.wikimedia.org. Source: <a href="https://github.com/1a1a11a/libCacheSim">libCacheSim</a></p>
     <div class="line-chart-container">
         <canvas id="wikipediaChart"></canvas>
     </div>
@@ -978,6 +966,87 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         </thead>
         <tbody>
         {{range $r := sortByHitRate .HitRate.Wikipedia $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.ThesiosBlock}}
+    <h3 style="margin-top: 50px;">Google Thesios I/O Block Trace</h3>
+    <p class="suite-description">400K read operations, ~322K unique blocks. Source: <a href="https://dl.acm.org/doi/10.1145/3620666.3651337">Tectonic-Shift (SOSP '24)</a></p>
+    <div class="line-chart-container">
+        <canvas id="thesiosBlockChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.ThesiosBlock $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.ThesiosFile}}
+    <h3 style="margin-top: 50px;">Google Thesios I/O File Trace</h3>
+    <p class="suite-description">400K read operations, ~46K unique files. Source: <a href="https://dl.acm.org/doi/10.1145/3620666.3651337">Tectonic-Shift (SOSP '24)</a></p>
+    <div class="line-chart-container">
+        <canvas id="thesiosFileChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.ThesiosFile $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.IBMDocker}}
+    <h3 style="margin-top: 50px;">IBM Docker Registry Trace</h3>
+    <p class="suite-description">725K GET requests, ~121K unique URIs. Source: <a href="https://www.usenix.org/conference/fast18/presentation/anwar">FAST '18</a></p>
+    <div class="line-chart-container">
+        <canvas id="ibmDockerChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.IBMDocker $sizes}}
         <tr>
             <td>{{$r.Name}}</td>
             {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
@@ -1360,6 +1429,15 @@ createLineChart('twitterChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRat
 {{end}}
 {{if .HitRate.Wikipedia}}
 createLineChart('wikipediaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Wikipedia $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.ThesiosBlock}}
+createLineChart('thesiosBlockChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosBlock $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.ThesiosFile}}
+createLineChart('thesiosFileChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosFile $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.IBMDocker}}
+createLineChart('ibmDockerChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.IBMDocker $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{end}}
 

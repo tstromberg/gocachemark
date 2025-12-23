@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/Code-Hex/go-generics-cache v1.5.1
 	github.com/Yiling-J/theine-go v0.6.2
-	github.com/codeGROOVE-dev/sfcache v1.5.0
+	github.com/codeGROOVE-dev/multicache v1.5.0
 	github.com/coocood/freecache v1.2.4
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/dgryski/go-s4lru v0.0.0-20150401095600-fd9b33c61bfe
@@ -32,4 +32,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/codeGROOVE-dev/sfcache => /Users/t/dev/r2r/sfcache
+replace github.com/codeGROOVE-dev/multicache => /Users/t/dev/r2r/multicache

@@ -33,5 +33,6 @@ func (c *ristrettoCache) Name() string {
 }
 
 func (c *ristrettoCache) Close() {
+	c.c.Wait() // flush pending async writes
 	c.c.Close()
 }

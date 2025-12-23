@@ -204,7 +204,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 				data = append(data, fmt.Sprintf("%.2f", r.Rates[size]))
 			}
 			datasets = append(datasets, fmt.Sprintf(
-				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}`,
+				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,borderWidth:1.5,pointRadius:2,pointHoverRadius:4}`,
 				r.Name, strings.Join(data, ","), color, color,
 			))
 		}
@@ -249,11 +249,27 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 				data = append(data, fmt.Sprintf("%.0f", r.QPS[t]))
 			}
 			datasets = append(datasets, fmt.Sprintf(
-				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,pointRadius:3,pointHoverRadius:5}`,
+				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,borderWidth:1.5,pointRadius:2,pointHoverRadius:4}`,
 				r.Name, strings.Join(data, ","), color, color,
 			))
 		}
 		return template.JS("[" + strings.Join(datasets, ",") + "]")
+	},
+	"allocColor": func(n int) string {
+		switch {
+		case n == 0:
+			return "background:#fff;color:#333"
+		case n == 1:
+			return "background:#fff3cd;color:#333"
+		case n == 2:
+			return "background:#ffcc80;color:#333"
+		case n == 3:
+			return "background:#ef5350;color:#fff"
+		case n == 4:
+			return "background:#c62828;color:#fff"
+		default:
+			return "background:#8b0000;color:#fff"
+		}
 	},
 	"pct": func(f float64) string { return fmt.Sprintf("%.2f", f) },
 	"ns":  func(f float64) string { return fmt.Sprintf("%.1f", f) },
@@ -398,7 +414,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>gocachemark - Go Cache Benchmark Results</title>
+    <title>Go Cache Benchmark Report</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -457,40 +473,20 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
             text-decoration: underline;
         }
         .benchmark-info-top {
-            padding: 15px;
+            padding: 12px 15px;
             margin-bottom: 30px;
-            border: 1px solid #ddd;
-            background: #fafafa;
-            font-size: 0.9em;
-        }
-        .benchmark-info-grid {
-            display: grid;
-            grid-template-columns: repeat(3, auto);
-            gap: 20px;
-            margin-bottom: 10px;
-        }
-        .benchmark-info-top .info-item {
+            background: #f5f5f5;
+            font-size: 0.85em;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
             display: flex;
-            gap: 8px;
-            white-space: nowrap;
-        }
-        .benchmark-info-command {
-            display: flex;
-            gap: 8px;
-            padding-top: 10px;
-            border-top: 1px solid #ddd;
+            gap: 15px;
+            align-items: center;
         }
         .benchmark-info-top .info-label {
-            font-weight: 600;
-            color: #000;
+            color: #666;
         }
         .benchmark-info-top .info-value {
-            color: #555;
-            font-family: "SF Mono", Monaco, "Courier New", monospace;
-        }
-        .benchmark-info-command .info-value {
-            overflow-x: auto;
-            white-space: nowrap;
+            color: #333;
         }
         .podium-container {
             display: flex;
@@ -768,37 +764,23 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>gocachemark</h1>
+    <h1>Go Cache Benchmark Report</h1>
     <p class="timestamp">
-        Benchmark report for Go cache implementations.
-        <a href="https://github.com/tstromberg/gocachemark" target="_blank">View on GitHub →</a>
+        <a href="https://github.com/tstromberg/gocachemark" target="_blank">gocachemark</a> ·
+        {{.MachineInfo.OS}}/{{.MachineInfo.Arch}} · {{.MachineInfo.NumCPU}} CPUs · {{.MachineInfo.GoVersion}}
     </p>
 
     <div class="benchmark-info-top">
-        <div class="benchmark-info-grid">
-            <div class="info-item">
-                <span class="info-label">Generated:</span>
-                <span class="info-value">{{.Timestamp}}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Machine:</span>
-                <span class="info-value">{{.MachineInfo.OS}}/{{.MachineInfo.Arch}} ({{.MachineInfo.NumCPU}} CPUs)</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Go Version:</span>
-                <span class="info-value">{{.MachineInfo.GoVersion}}</span>
-            </div>
-        </div>
-        <div class="benchmark-info-command info-item">
-            <span class="info-label">Command:</span>
+        <div class="info-item">
+            <span class="info-label">{{.Timestamp}}</span>
             <span class="info-value">{{.MachineInfo.CommandLine}}</span>
         </div>
     </div>
 
 {{if .Rankings}}
     <div class="section-header">
-        <h2>Overall Winners</h2>
-        <p>Ranked voting across all benchmarks</p>
+        <h2>Rankings</h2>
+        <p>Borda count across all benchmarks</p>
     </div>
 
     <div class="podium-container">
@@ -1123,11 +1105,11 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         <tr>
             <td>{{.Name}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetNsOp $maxGet}}px"></div><span class="cell-value">{{ns .GetNsOp}}</span></div></td>
-            <td>{{.GetAllocs}}</td>
+            <td style="{{allocColor .GetAllocs}}">{{.GetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
-            <td>{{.SetAllocs}}</td>
+            <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
-            <td>{{.SetEvictAllocs}}</td>
+            <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
             <td style="font-weight:bold;">{{ns (avgLatency .)}}</td>
         </tr>
         {{end}}
@@ -1161,11 +1143,11 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         <tr>
             <td>{{.Name}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetNsOp $maxIntGet}}px"></div><span class="cell-value">{{ns .GetNsOp}}</span></div></td>
-            <td>{{.GetAllocs}}</td>
+            <td style="{{allocColor .GetAllocs}}">{{.GetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxIntSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
-            <td>{{.SetAllocs}}</td>
+            <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxIntEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
-            <td>{{.SetEvictAllocs}}</td>
+            <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
             <td style="font-weight:bold;">{{ns (avgIntLatency .)}}</td>
         </tr>
         {{end}}
@@ -1193,7 +1175,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         <tr>
             <td>{{.Name}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .NsOp $maxGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .NsOp}}</span></div></td>
-            <td>{{.Allocs}}</td>
+            <td style="{{allocColor .Allocs}}">{{.Allocs}}</td>
         </tr>
         {{end}}
         </tbody>
@@ -1260,6 +1242,34 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         </thead>
         <tbody>
         {{range $r := sortByThroughput .Throughput.IntResults $threads}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
+            <td style="font-weight:bold;">{{qps (avgQPS $r)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Throughput.GetOrSetResults}}
+    <h3 style="margin-top: 50px;">GetOrSet Operations</h3>
+    <p class="suite-description">Atomic get-or-compute operations with URL-like keys. Only caches supporting GetOrSet are shown.</p>
+    <div class="line-chart-container">
+        <canvas id="throughputGetOrSetChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $threads}}<th class="sortable">{{.}}T</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByThroughput .Throughput.GetOrSetResults $threads}}
         <tr>
             <td>{{$r.Name}}</td>
             {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
@@ -1480,6 +1490,9 @@ createLineChart('throughputChart', {{threadLabels $threads}}, {{throughputDatase
 {{if .Throughput.IntResults}}
 createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntResults $threads}}, 'QPS');
 {{end}}
+{{if .Throughput.GetOrSetResults}}
+createLineChart('throughputGetOrSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.GetOrSetResults $threads}}, 'QPS');
+{{end}}
 {{end}}
 }
 
@@ -1496,7 +1509,15 @@ createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDat
 </script>
 
 <footer>
-    Generated by <a href="https://github.com/tstromberg/gocachemark" target="_blank">gocachemark</a>
+    <a href="https://github.com/tstromberg/gocachemark">gocachemark</a> ·
+    Caches: <a href="https://github.com/codeGROOVE-dev/multicache">multicache</a>,
+    <a href="https://github.com/maypok86/otter">otter</a>,
+    <a href="https://github.com/dgraph-io/ristretto">ristretto</a>,
+    <a href="https://github.com/coocood/freecache">freecache</a>,
+    <a href="https://github.com/hashicorp/golang-lru">lru</a>,
+    <a href="https://github.com/Yiling-J/theine-go">theine</a>,
+    <a href="https://github.com/cespare/xxhash">tinylfu</a>,
+    <a href="https://github.com/jellydator/ttlcache">ttlcache</a>
 </footer>
 
 </body>

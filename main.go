@@ -29,6 +29,18 @@ var threadCounts []int
 // validSuites lists all available benchmark suites.
 var validSuites = []string{"hitrate", "latency", "throughput", "memory"}
 
+// validTests lists all available test names.
+var validTests = []string{
+	// hitrate
+	"cdn", "meta", "zipf", "twitter", "wikipedia", "thesios-block", "thesios-file", "ibm-docker", "tencent-photo",
+	// latency
+	"string", "int", "getorset",
+	// throughput
+	"string-throughput", "int-throughput", "getorset-throughput",
+	// memory
+	"memory",
+}
+
 // suiteFilter holds which suites to run.
 var suiteFilter map[string]bool
 
@@ -75,8 +87,23 @@ func main() {
 	// Apply test filter
 	if *tests != "" {
 		testFilter = make(map[string]bool)
+		validTestSet := make(map[string]bool)
+		for _, t := range validTests {
+			validTestSet[t] = true
+		}
 		for _, t := range strings.Split(*tests, ",") {
-			testFilter[strings.TrimSpace(strings.ToLower(t))] = true
+			t = strings.TrimSpace(strings.ToLower(t))
+			if t == "" {
+				continue
+			}
+			if !validTestSet[t] {
+				fmt.Fprintf(os.Stderr, "error: unknown test %q\n\nAvailable tests:\n", t)
+				for _, vt := range validTests {
+					fmt.Fprintf(os.Stderr, "  %s\n", vt)
+				}
+				os.Exit(1)
+			}
+			testFilter[t] = true
 		}
 	}
 
@@ -178,6 +205,7 @@ func printUsage() {
 	fmt.Println("    thesios-block           Google Thesios I/O block trace")
 	fmt.Println("    thesios-file            Google Thesios I/O file trace")
 	fmt.Println("    ibm-docker              IBM Docker Registry trace")
+	fmt.Println("    tencent-photo           Tencent Photo trace")
 	fmt.Println()
 	fmt.Println("  latency - Single-threaded latency benchmarks (ns/op)")
 	fmt.Println("    string                  String key Get/Set operations")
@@ -336,6 +364,17 @@ func runHitRateBenchmarks() *output.HitRateData {
 		} else {
 			data.IBMDocker = ibmDockerResults
 			printHitRateTable(ibmDockerResults, sizes)
+		}
+	}
+
+	if shouldRunTest("tencent-photo") {
+		printTest("tencent-photo", trace.TencentPhotoInfo())
+		tencentPhotoResults, err := benchmark.RunTencentPhotoHitRate(sizes)
+		if err != nil {
+			fmt.Printf("  error: %v\n\n", err)
+		} else {
+			data.TencentPhoto = tencentPhotoResults
+			printHitRateTable(tencentPhotoResults, sizes)
 		}
 	}
 
@@ -644,6 +683,7 @@ func computeOverallRanking(results output.Results) []output.Ranking {
 			results.HitRate.ThesiosBlock,
 			results.HitRate.ThesiosFile,
 			results.HitRate.IBMDocker,
+			results.HitRate.TencentPhoto,
 		}
 		for _, data := range hitRateBenchmarks {
 			if len(data) == 0 {

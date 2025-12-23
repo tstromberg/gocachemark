@@ -38,6 +38,8 @@ const (
 	ThesiosFileEntrySize = 160
 	// IBM Docker trace: key is ~40 bytes (URI), value=key, ~32 bytes overhead
 	IBMDockerEntrySize = 115
+	// Tencent Photo trace: key is 40 bytes (hex hash), value=key, ~32 bytes overhead
+	TencentPhotoEntrySize = 115
 )
 
 // RunCDNHitRate benchmarks hit rates using the CDN production trace.
@@ -339,6 +341,45 @@ func RunIBMDockerHitRate(sizes []int) ([]HitRateResult, error) {
 }
 
 func runIBMDockerTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+	c := factory(cacheSize)
+	defer c.Close()
+
+	var hits, misses int64
+	for _, key := range ops {
+		if _, ok := c.Get(key); ok {
+			hits++
+		} else {
+			misses++
+			c.Set(key, key)
+		}
+	}
+	return float64(hits) / float64(hits+misses) * 100
+}
+
+// RunTencentPhotoHitRate benchmarks hit rates using the Tencent Photo trace.
+func RunTencentPhotoHitRate(sizes []int) ([]HitRateResult, error) {
+	ops, err := trace.LoadTencentPhotoTrace()
+	if err != nil {
+		return nil, fmt.Errorf("load Tencent Photo trace: %w", err)
+	}
+
+	results := make([]HitRateResult, 0, len(cache.All()))
+	for _, factory := range cache.AllWithEntrySize(TencentPhotoEntrySize) {
+		c := factory(sizes[0])
+		name := c.Name()
+		c.Close()
+
+		rates := make(map[int]float64)
+		for _, size := range sizes {
+			rates[size] = runTencentPhotoTrace(factory, ops, size)
+		}
+		results = append(results, HitRateResult{Name: name, Rates: rates})
+	}
+
+	return results, nil
+}
+
+func runTencentPhotoTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
 	c := factory(cacheSize)
 	defer c.Close()
 

@@ -56,7 +56,7 @@ gocachemark -all         # Run all benchmarks
 
 ### Available Tests
 
-- **Hit rate**: cdn, meta, zipf, twitter, wikipedia, thesios-block, thesios-file, ibm-docker
+- **Hit rate**: cdn, meta, zipf, twitter, wikipedia, thesios-block, thesios-file, ibm-docker, tencent-photo
 - **Latency**: string, int, getorset
 - **Throughput**: string-throughput, int-throughput, getorset-throughput
 - **Memory**: memory
@@ -83,6 +83,7 @@ Measures cache hit rates using production traces and synthetic workloads:
 - **Google Thesios I/O block trace** - Google storage I/O block-level patterns (400K reads, 322K unique blocks). Citation: [Tectonic-Shift](https://dl.acm.org/doi/10.1145/3620666.3651337) (SOSP '24)
 - **Google Thesios I/O file trace** - Google storage I/O file-level patterns (400K reads, 46K unique files). Citation: [Tectonic-Shift](https://dl.acm.org/doi/10.1145/3620666.3651337) (SOSP '24)
 - **IBM Docker Registry trace** - IBM container registry access patterns (725K GETs, 121K unique URIs). Citation: [Improving Docker Registry Design Based on Production Workload Analysis](https://www.usenix.org/conference/fast18/presentation/anwar) (FAST '18)
+- **Tencent Photo trace** - Tencent photo storage access patterns (2M requests, 1.34M unique photos). Citation: [Analysis of Photo Storage and Caching in Tencent](https://dl.acm.org/doi/10.1145/3205289.3205299) (ATC '18)
 
 ### Latency
 

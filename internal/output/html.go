@@ -57,6 +57,7 @@ type HitRateData struct {
 	ThesiosBlock []benchmark.HitRateResult
 	ThesiosFile  []benchmark.HitRateResult
 	IBMDocker    []benchmark.HitRateResult
+	TencentPhoto []benchmark.HitRateResult
 	Sizes        []int
 }
 
@@ -1056,6 +1057,33 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
         </tbody>
     </table>
     {{end}}
+
+    {{if .HitRate.TencentPhoto}}
+    <h3 style="margin-top: 50px;">Tencent Photo Trace</h3>
+    <p class="suite-description">2M requests, ~1.34M unique photos. Source: <a href="https://dl.acm.org/doi/10.1145/3205289.3205299">ATC '18</a></p>
+    <div class="line-chart-container">
+        <canvas id="tencentPhotoChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.TencentPhoto $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
     </div>
 </div>
 {{end}}
@@ -1438,6 +1466,9 @@ createLineChart('thesiosFileChart', {{sizeLabels $sizes}}, {{hitRateDatasets .Hi
 {{end}}
 {{if .HitRate.IBMDocker}}
 createLineChart('ibmDockerChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.IBMDocker $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.TencentPhoto}}
+createLineChart('tencentPhotoChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.TencentPhoto $sizes}}, 'Hit Rate (%)', false);
 {{end}}
 {{end}}
 

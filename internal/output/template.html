@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>gocachemark - Go Cache Benchmark Report @ {{.Timestamp}}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            line-height: 1.6;
+            color: #333;
+        }
+        @media print {
+            body { padding: 20px; }
+            .medal-table-container { page-break-inside: avoid; }
+            .chart-container { page-break-inside: avoid; }
+        }
+        h1 {
+            color: #000;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            font-size: 2em;
+            font-weight: 600;
+        }
+        h2 {
+            color: #000;
+            margin-top: 50px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        h3 {
+            color: #333;
+            margin-top: 30px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        h4 {
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 20px;
+        }
+        .timestamp a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .timestamp a:hover {
+            text-decoration: underline;
+        }
+        .benchmark-info-top {
+            padding: 12px 15px;
+            margin-bottom: 30px;
+            background: #f5f5f5;
+            font-size: 0.85em;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .benchmark-info-top .info-label {
+            color: #666;
+        }
+        .benchmark-info-top .info-value {
+            color: #333;
+        }
+        .medal-table-container {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+        }
+        .medal-bar-row {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            height: 32px;
+        }
+        .medal-bar-label {
+            width: 130px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #000;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .medal-bar-wrapper {
+            flex: 1;
+            height: 24px;
+        }
+        .medal-bar-container {
+            height: 100%;
+            display: flex;
+            min-width: 0;
+            border: 1px solid rgba(0,0,0,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .medal-segment {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            min-width: 24px;
+        }
+        .medal-segment.gold {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        }
+        .medal-segment.silver {
+            background: linear-gradient(135deg, #E8E8E8 0%, #A0A0A0 100%);
+        }
+        .medal-segment.bronze {
+            background: linear-gradient(135deg, #CD853F 0%, #8B4513 100%);
+            color: #fff;
+        }
+        .medal-segment.other {
+            background: linear-gradient(135deg, #666 0%, #333 100%);
+            color: #fff;
+        }
+        .medal-counts {
+            width: 260px;
+            display: flex;
+            gap: 8px;
+            padding-left: 15px;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 13px;
+            align-items: center;
+        }
+        .medal-count {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .medal-points {
+            color: #555;
+            font-weight: 600;
+            margin-left: 4px;
+            padding-left: 8px;
+            border-left: 1px solid #ddd;
+            min-width: 55px;
+            white-space: nowrap;
+        }
+        .medal-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        .medal-icon.gold { background: #FFD700; }
+        .medal-icon.silver { background: #C0C0C0; }
+        .medal-icon.bronze { background: #CD853F; color: #fff; }
+        .winner-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+            text-transform: uppercase;
+        }
+        .benchmark-medals-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .benchmark-medals-table th,
+        .benchmark-medals-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .benchmark-medals-table th {
+            background: #f9f9f9;
+            font-weight: 600;
+            color: #333;
+        }
+        .benchmark-medals-table .category {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .benchmark-medals-table .cache-cell {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        .benchmark-medals-table .gold-cell { background: rgba(255, 215, 0, 0.15); }
+        .benchmark-medals-table .silver-cell { background: rgba(192, 192, 192, 0.15); }
+        .benchmark-medals-table .bronze-cell { background: rgba(205, 127, 50, 0.15); }
+        .category-section {
+            margin: 25px 0;
+            padding: 15px 20px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+        }
+        .category-section h4 {
+            margin: 0 0 15px 0;
+            font-size: 1.1em;
+            color: #333;
+        }
+        .category-winner {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-weight: 700;
+            color: #2E7D32;
+        }
+        .category-content {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+        .category-standings {
+            min-width: 180px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 10px 15px;
+        }
+        .category-rank-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 0.9em;
+        }
+        .category-rank-name {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-weight: 500;
+        }
+        .category-rank-medals {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            font-size: 0.85em;
+        }
+        .category-rank-medals .medal-icon {
+            width: 14px;
+            height: 14px;
+        }
+        .no-medals {
+            color: #999;
+        }
+        .category-content .benchmark-medals-table {
+            flex: 1;
+            margin: 0;
+        }
+        .section-header {
+            padding: 15px 0;
+            margin: 40px 0 20px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .section-header h2 {
+            margin: 0;
+            border: none;
+        }
+        .section-header p {
+            margin: 10px 0 0 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .toc {
+            padding: 20px 0;
+            margin: 30px 0;
+            border-top: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+        }
+        .toc h2 {
+            margin: 0 0 15px 0;
+            color: #000;
+            border: none;
+            font-size: 1.2em;
+        }
+        .toc ul {
+            list-style: disc;
+            padding-left: 20px;
+            margin: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+        }
+        .toc a {
+            text-decoration: none;
+            color: #0066cc;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .toc a .icon {
+            margin-right: 8px;
+        }
+        .collapsible-section {
+            border: 1px solid #ddd;
+            margin: 30px 0;
+            background: white;
+        }
+        .section-toggle {
+            cursor: pointer;
+            padding: 15px 20px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+        .section-toggle h2 {
+            margin: 0;
+            color: #000;
+            border: none;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        .section-toggle .toggle-icon {
+            font-size: 1.5em;
+        }
+        .section-toggle.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+        .section-content {
+            padding: 30px;
+        }
+        .section-content.collapsed {
+            display: none;
+        }
+        .suite-description {
+            margin: 0 0 20px 0;
+            padding: 10px 0 10px 15px;
+            border-left: 3px solid #666;
+            color: #555;
+        }
+        .chart-container {
+            padding: 20px;
+            margin: 30px 0;
+            border: 1px solid #ddd;
+        }
+        footer {
+            margin-top: 60px;
+            padding: 20px 0;
+            border-top: 1px solid #ddd;
+            color: #999;
+            font-size: 0.85em;
+            text-align: center;
+        }
+        footer a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        .bar-row {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            height: 24px;
+        }
+        .bar-label {
+            width: 120px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #000;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .bar-container {
+            flex: 1;
+            height: 18px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            overflow: hidden;
+        }
+        .bar {
+            height: 100%;
+            background: #2E7D32;
+        }
+        .bar-value {
+            width: 90px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            padding-left: 10px;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+        }
+        .bar.latency { background: #2E7D32; }
+        .bar.memory { background: #2E7D32; }
+        .bar.throughput { background: #2E7D32; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid #ddd;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f5f5f5;
+            color: #000;
+            font-weight: 600;
+            border-bottom: 2px solid #000;
+        }
+        td {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 0.9em;
+        }
+        td:first-child {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-weight: 500;
+        }
+        .best { font-weight: bold; }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 25px;
+        }
+        th.sortable:hover {
+            background: #e5e5e5;
+        }
+        th.sortable::after {
+            content: '▼';
+            position: absolute;
+            right: 8px;
+            opacity: 0.3;
+            font-size: 0.7em;
+        }
+        th.sortable.sorted-asc::after {
+            content: '▲';
+            opacity: 1;
+        }
+        th.sortable.sorted-desc::after {
+            content: '▼';
+            opacity: 1;
+        }
+        .cell-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cell-bar {
+            height: 12px;
+            background: #2E7D32;
+            min-width: 2px;
+        }
+        .cell-bar.set { background: #388E3C; }
+        .cell-bar.evict { background: #43A047; }
+        .cell-value {
+            white-space: nowrap;
+            min-width: 50px;
+        }
+        .line-chart-container {
+            padding: 20px;
+            margin: 30px 0;
+            border: 1px solid #ddd;
+            height: 400px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>gocachemark - Go Cache Benchmark Report @ {{.Timestamp}}</h1>
+    <p class="timestamp">
+        <a href="https://github.com/tstromberg/gocachemark" target="_blank">gocachemark</a> ·
+        {{.MachineInfo.OS}}/{{.MachineInfo.Arch}} · {{.MachineInfo.NumCPU}} CPUs · {{.MachineInfo.GoVersion}}
+    </p>
+
+    <div class="benchmark-info-top">
+        <div class="info-item">
+            <span class="info-label">{{.Timestamp}}</span>
+            <span class="info-value">{{.MachineInfo.CommandLine}}</span>
+        </div>
+    </div>
+
+<div class="toc">
+    <h2>Table of Contents</h2>
+    <ul>
+        {{if .Rankings}}<li><a href="#standings">Medal Standings</a></li>{{end}}
+        {{if .MedalTable}}<li><a href="#medals-by-category">Medals by Category</a></li>{{end}}
+        {{if .HitRate}}<li><a href="#hitrate">Hit Rate Benchmarks</a></li>{{end}}
+        {{if .Latency}}<li><a href="#latency">Latency Benchmarks</a></li>{{end}}
+        {{if .Throughput}}<li><a href="#throughput">Throughput Benchmarks</a></li>{{end}}
+        {{if .Memory}}<li><a href="#memory">Memory Benchmarks</a></li>{{end}}
+    </ul>
+</div>
+
+{{if .Rankings}}
+    <div class="section-header" id="standings">
+        <h2>Medal Standings</h2>
+        <p>Ranked by total points earned across all benchmarks</p>
+    </div>
+
+    <div class="medal-table-container">
+        {{$first := index .Rankings 0}}
+        {{$maxScore := $first.Score}}
+        {{range $i, $r := .Rankings}}
+        {{$barWidth := barWidth $r.Score $maxScore}}
+        {{$medalPoints := addf (addf (mul (toFloat64Int $r.Gold) 10.0) (mul (toFloat64Int $r.Silver) 7.0)) (mul (toFloat64Int $r.Bronze) 5.0)}}
+        {{$otherPoints := sub $r.Score $medalPoints}}
+        <div class="medal-bar-row">
+            <div class="medal-bar-label">{{$r.Name}}</div>
+            <div class="medal-bar-wrapper">
+                <div class="medal-bar-container" style="width: {{printf "%.1f" $barWidth}}%;">
+                    {{if gt $r.Gold 0}}<div class="medal-segment gold" style="flex: {{mul (toFloat64Int $r.Gold) 10.0}};"></div>{{end}}
+                    {{if gt $r.Silver 0}}<div class="medal-segment silver" style="flex: {{mul (toFloat64Int $r.Silver) 7.0}};"></div>{{end}}
+                    {{if gt $r.Bronze 0}}<div class="medal-segment bronze" style="flex: {{mul (toFloat64Int $r.Bronze) 5.0}};"></div>{{end}}
+                    {{if gt $otherPoints 0.0}}<div class="medal-segment other" style="flex: {{$otherPoints}};"></div>{{end}}
+                </div>
+            </div>
+            <div class="medal-counts">
+                <span class="medal-count"><span class="medal-icon gold"></span>{{$r.Gold}}</span>
+                <span class="medal-count"><span class="medal-icon silver"></span>{{$r.Silver}}</span>
+                <span class="medal-count"><span class="medal-icon bronze"></span>{{$r.Bronze}}</span>
+                <span class="medal-points">{{printf "%.0f" $r.Score}} pts</span>
+                {{if eq $i 0}}<span class="winner-badge">Winner</span>{{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+
+    {{if .MedalTable}}
+    <h3 id="medals-by-category">Medals by Category</h3>
+    {{range .MedalTable.Categories}}
+    <div class="category-section">
+        <h4>{{.Name}}{{if .Rankings}} — Winner: <span class="category-winner">{{(index .Rankings 0).Name}}</span>{{end}}</h4>
+        <div class="category-content">
+            {{if .Rankings}}
+            <div class="category-standings">
+                {{range $i, $r := .Rankings}}
+                {{$totalMedals := add (add $r.Gold $r.Silver) $r.Bronze}}
+                <div class="category-rank-row">
+                    <span class="category-rank-name">{{$r.Name}}</span>
+                    <span class="category-rank-medals">
+                        {{if gt $r.Gold 0}}<span class="medal-icon gold"></span>{{$r.Gold}}{{end}}
+                        {{if gt $r.Silver 0}}<span class="medal-icon silver"></span>{{$r.Silver}}{{end}}
+                        {{if gt $r.Bronze 0}}<span class="medal-icon bronze"></span>{{$r.Bronze}}{{end}}
+                        {{if eq $totalMedals 0}}<span class="no-medals">—</span>{{end}}
+                    </span>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+            <table class="benchmark-medals-table">
+                <thead>
+                    <tr>
+                        <th>Benchmark</th>
+                        <th class="gold-cell">Gold</th>
+                        <th class="silver-cell">Silver</th>
+                        <th class="bronze-cell">Bronze</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{range .Benchmarks}}
+                    <tr>
+                        <td>{{.Name}}</td>
+                        <td class="cache-cell gold-cell">{{.Gold}}</td>
+                        <td class="cache-cell silver-cell">{{.Silver}}</td>
+                        <td class="cache-cell bronze-cell">{{.Bronze}}</td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {{end}}
+    {{end}}
+{{end}}
+
+{{if .HitRate}}
+<div class="collapsible-section" id="hitrate">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Hit Rate Benchmarks</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Higher hit rates mean better cache effectiveness. Tests measure how often requested items are found in the cache across different cache sizes.</p>
+
+    {{$sizes := .HitRate.Sizes}}
+    {{$maxSize := index $sizes (len $sizes | add -1)}}
+
+    {{if .HitRate.CDN}}
+    <h3>CDN Production Trace</h3>
+    <p class="suite-description">2M operations, ~768K unique keys. Source: <a href="https://github.com/1a1a11a/libCacheSim">libCacheSim</a></p>
+    <div class="line-chart-container">
+        <canvas id="cdnChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.CDN $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.Meta}}
+    <h3 style="margin-top: 50px;">Meta KVCache Production Trace</h3>
+    <p class="suite-description">5M operations. Source: <a href="https://cachelib.org/">CacheLib</a></p>
+    <div class="line-chart-container">
+        <canvas id="metaChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.Meta $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.Zipf}}
+    <h3 style="margin-top: 50px;">Zipf Synthetic Trace</h3>
+    <p class="suite-description">alpha=0.8, 2M operations, 100K keyspace</p>
+    <div class="line-chart-container">
+        <canvas id="zipfChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.Zipf $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.Twitter}}
+    <h3 style="margin-top: 50px;">Twitter Production Cache Trace</h3>
+    <p class="suite-description">2M operations, cluster001+cluster052. Source: <a href="https://github.com/twitter/cache-trace">Twitter Cache Trace</a></p>
+    <div class="line-chart-container">
+        <canvas id="twitterChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.Twitter $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.Wikipedia}}
+    <h3 style="margin-top: 50px;">Wikipedia CDN Upload Trace</h3>
+    <p class="suite-description">2M operations, upload.wikimedia.org. Source: <a href="https://github.com/1a1a11a/libCacheSim">libCacheSim</a></p>
+    <div class="line-chart-container">
+        <canvas id="wikipediaChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.Wikipedia $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.ThesiosBlock}}
+    <h3 style="margin-top: 50px;">Google Thesios I/O Block Trace</h3>
+    <p class="suite-description">400K read operations, ~322K unique blocks. Source: <a href="https://dl.acm.org/doi/10.1145/3620666.3651337">Tectonic-Shift (SOSP '24)</a></p>
+    <div class="line-chart-container">
+        <canvas id="thesiosBlockChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.ThesiosBlock $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.ThesiosFile}}
+    <h3 style="margin-top: 50px;">Google Thesios I/O File Trace</h3>
+    <p class="suite-description">400K read operations, ~46K unique files. Source: <a href="https://dl.acm.org/doi/10.1145/3620666.3651337">Tectonic-Shift (SOSP '24)</a></p>
+    <div class="line-chart-container">
+        <canvas id="thesiosFileChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.ThesiosFile $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.IBMDocker}}
+    <h3 style="margin-top: 50px;">IBM Docker Registry Trace</h3>
+    <p class="suite-description">725K GET requests, ~121K unique URIs. Source: <a href="https://www.usenix.org/conference/fast18/presentation/anwar">FAST '18</a></p>
+    <div class="line-chart-container">
+        <canvas id="ibmDockerChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.IBMDocker $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .HitRate.TencentPhoto}}
+    <h3 style="margin-top: 50px;">Tencent Photo Trace</h3>
+    <p class="suite-description">2M requests, ~1.34M unique photos. Source: <a href="https://dl.acm.org/doi/10.1145/3205289.3205299">ATC '18</a></p>
+    <div class="line-chart-container">
+        <canvas id="tencentPhotoChart"></canvas>
+    </div>
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $sizes}}<th class="sortable">{{divK .}}K</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByHitRate .HitRate.TencentPhoto $sizes}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $sizes}}<td>{{pct (index $r.Rates .)}}%</td>{{end}}
+            <td style="font-weight:bold;">{{pct (avgHitRate $r $sizes)}}%</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+    </div>
+</div>
+{{end}}
+
+{{if .Latency}}
+<div class="collapsible-section" id="latency">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Latency Benchmarks (Single-Threaded)</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Lower latency means faster operations. Measures the time (in nanoseconds) for individual Get, Set, and SetEvict operations in a single-threaded environment.</p>
+
+    {{$sortedResults := sortByGetLatency .Latency.Results}}
+    {{$maxGet := maxLatency $sortedResults}}
+    {{$maxSet := maxSetLatency $sortedResults}}
+    {{$maxEvict := maxSetEvictLatency $sortedResults}}
+
+    <h3>String Keys</h3>
+
+    <h4>Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">Get (ns)</th>
+            <th class="sortable">Get allocs</th>
+            <th class="sortable">Set (ns)</th>
+            <th class="sortable">Set allocs</th>
+            <th class="sortable">SetEvict (ns)</th>
+            <th class="sortable">SetEvict allocs</th>
+            <th class="sortable">Avg (ns)</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $sortedResults}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetNsOp $maxGet}}px"></div><span class="cell-value">{{ns .GetNsOp}}</span></div></td>
+            <td style="{{allocColor .GetAllocs}}">{{.GetAllocs}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
+            <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
+            <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
+            <td style="font-weight:bold;">{{ns (avgLatency .)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+
+    {{if .Latency.IntResults}}
+    {{$sortedIntResults := sortByIntGetLatency .Latency.IntResults}}
+    {{$maxIntGet := maxIntLatency $sortedIntResults}}
+    {{$maxIntSet := maxIntSetLatency $sortedIntResults}}
+    {{$maxIntEvict := maxIntSetEvictLatency $sortedIntResults}}
+
+    <h3 style="margin-top: 40px;">Int Keys</h3>
+
+    <h4>Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">Get (ns)</th>
+            <th class="sortable">Get allocs</th>
+            <th class="sortable">Set (ns)</th>
+            <th class="sortable">Set allocs</th>
+            <th class="sortable">SetEvict (ns)</th>
+            <th class="sortable">SetEvict allocs</th>
+            <th class="sortable">Avg (ns)</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $sortedIntResults}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .GetNsOp $maxIntGet}}px"></div><span class="cell-value">{{ns .GetNsOp}}</span></div></td>
+            <td style="{{allocColor .GetAllocs}}">{{.GetAllocs}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar set" style="width: {{barWidth .SetNsOp $maxIntSet}}px"></div><span class="cell-value">{{ns .SetNsOp}}</span></div></td>
+            <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxIntEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
+            <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
+            <td style="font-weight:bold;">{{ns (avgIntLatency .)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Latency.GetOrSetResults}}
+    {{$getOrSetResults := sortGetOrSet .Latency.GetOrSetResults}}
+    {{$maxGetOrSet := maxGetOrSetLatency .Latency.GetOrSetResults}}
+    <h3 style="margin-top: 40px;">String Keys - GetOrSet</h3>
+    <p class="suite-description">GetOrSet is an atomic operation that gets a value if it exists, or sets it if it doesn't. Only caches that support this operation are shown.</p>
+
+    <h4>GetOrSet Results</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">GetOrSet (ns)</th>
+            <th class="sortable">GetOrSet allocs</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $getOrSetResults}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth .NsOp $maxGetOrSet}}px; background: #2E7D32;"></div><span class="cell-value">{{ns .NsOp}}</span></div></td>
+            <td style="{{allocColor .Allocs}}">{{.Allocs}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    </div>
+</div>
+{{end}}
+
+{{if .Throughput}}
+<div class="collapsible-section" id="throughput">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Throughput Benchmarks (Multi-Threaded)</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Higher throughput means more queries per second (QPS). Tests measure concurrent performance with a Zipf workload (75% reads, 25% writes) across different thread counts.</p>
+
+    {{$threads := .Throughput.Threads}}
+    {{$maxThreads := index $threads (len $threads | add -1)}}
+
+    {{if .Throughput.Results}}
+    <h3>String Keys</h3>
+    <div class="line-chart-container">
+        <canvas id="throughputChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $threads}}<th class="sortable">{{.}}T</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByThroughput .Throughput.Results $threads}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
+            <td style="font-weight:bold;">{{qps (avgQPS $r)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Throughput.IntResults}}
+    <h3 style="margin-top: 50px;">Int Keys</h3>
+    <div class="line-chart-container">
+        <canvas id="throughputIntChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $threads}}<th class="sortable">{{.}}T</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByThroughput .Throughput.IntResults $threads}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
+            <td style="font-weight:bold;">{{qps (avgQPS $r)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Throughput.GetOrSetResults}}
+    <h3 style="margin-top: 50px;">GetOrSet Operations</h3>
+    <p class="suite-description">Atomic get-or-compute operations with URL-like keys. Only caches supporting GetOrSet are shown.</p>
+    <div class="line-chart-container">
+        <canvas id="throughputGetOrSetChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $threads}}<th class="sortable">{{.}}T</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByThroughput .Throughput.GetOrSetResults $threads}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
+            <td style="font-weight:bold;">{{qps (avgQPS $r)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+    </div>
+</div>
+{{end}}
+
+{{if .Memory}}
+<div class="collapsible-section" id="memory">
+    <div class="section-toggle" onclick="toggleSection(this)">
+        <h2>Memory Overhead Benchmarks</h2>
+        <span class="toggle-icon">▼</span>
+    </div>
+    <div class="section-content">
+        <p class="suite-description">Capacity: {{.Memory.Capacity}} items, Value size: {{.Memory.ValSize}} bytes. Measured in isolated processes. Overhead compared to baseline <code>map[string][]byte</code>. Lower is better.</p>
+
+    {{$results := .Memory.Results}}
+    {{$maxOverhead := maxOverhead $results}}
+    <h3>Memory Results</h3>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            <th class="sortable">Items Stored</th>
+            <th class="sortable">Memory (MB)</th>
+            <th class="sortable">Overhead vs map (bytes/item)</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $results}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td>{{.Items}}</td>
+            <td>{{mb .Bytes}}</td>
+            <td><div class="cell-bar-container"><div class="cell-bar" style="width: {{barWidth (toFloatInt .BytesPerItem) $maxOverhead}}px"></div><span class="cell-value">{{.BytesPerItem}}</span></div></td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+{{end}}
+
+<script>
+function createLineChart(canvasId, labels, datasets, yLabel, useLogY = false) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    const yAxisConfig = {
+        title: { display: true, text: yLabel },
+        beginAtZero: false
+    };
+
+    if (useLogY) {
+        yAxisConfig.type = 'logarithmic';
+        yAxisConfig.min = 1;
+        yAxisConfig.ticks = {
+            callback: function(value, index, ticks) {
+                if (value === 1 || value === 10 || value === 100 ||
+                    value === 5 || value === 50) {
+                    return value;
+                }
+                return null;
+            }
+        };
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right' }
+            },
+            scales: {
+                y: yAxisConfig,
+                x: {
+                    title: { display: true, text: 'Cache Size' }
+                }
+            }
+        }
+    });
+}
+
+function makeSortable(table) {
+    const headers = table.querySelectorAll('th.sortable');
+    const tbody = table.querySelector('tbody') || table;
+
+    headers.forEach((header, index) => {
+        header.addEventListener('click', () => {
+            const currentSort = header.classList.contains('sorted-desc') ? 'desc' :
+                              header.classList.contains('sorted-asc') ? 'asc' : 'none';
+            const newSort = currentSort === 'desc' ? 'asc' : 'desc';
+
+            headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+            header.classList.add(newSort === 'asc' ? 'sorted-asc' : 'sorted-desc');
+
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.sort((a, b) => {
+                let aVal = a.cells[index].textContent.trim();
+                let bVal = b.cells[index].textContent.trim();
+
+                aVal = aVal.replace(/%|ns|K|M|MB/g, '');
+                bVal = bVal.replace(/%|ns|K|M|MB/g, '');
+
+                const aNum = parseFloat(aVal);
+                const bNum = parseFloat(bVal);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return newSort === 'asc' ? aNum - bNum : bNum - aNum;
+                }
+
+                return newSort === 'asc' ?
+                    aVal.localeCompare(bVal) :
+                    bVal.localeCompare(aVal);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('table').forEach(table => {
+        if (table.querySelector('th.sortable')) {
+            makeSortable(table);
+
+            const avgHeader = Array.from(table.querySelectorAll('th.sortable'))
+                .find(th => th.textContent.trim() === 'Avg' || th.textContent.trim() === 'Average');
+            if (avgHeader) {
+                avgHeader.click();
+            }
+        }
+    });
+
+    document.querySelectorAll('.toc a').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = document.querySelector(link.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ block: 'start' });
+                const content = target.querySelector('.section-content');
+                const toggle = target.querySelector('.section-toggle');
+                if (content && content.classList.contains('collapsed')) {
+                    toggleSection(toggle);
+                }
+            }
+        });
+    });
+});
+
+function toggleSection(toggleElement) {
+    const content = toggleElement.nextElementSibling;
+    toggleElement.classList.toggle('collapsed');
+    content.classList.toggle('collapsed');
+}
+
+function initCharts() {
+{{if .HitRate}}
+{{$sizes := .HitRate.Sizes}}
+{{if .HitRate.CDN}}
+createLineChart('cdnChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.CDN $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.Meta}}
+createLineChart('metaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Meta $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.Zipf}}
+createLineChart('zipfChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Zipf $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.Twitter}}
+createLineChart('twitterChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Twitter $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.Wikipedia}}
+createLineChart('wikipediaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Wikipedia $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.ThesiosBlock}}
+createLineChart('thesiosBlockChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosBlock $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.ThesiosFile}}
+createLineChart('thesiosFileChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosFile $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.IBMDocker}}
+createLineChart('ibmDockerChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.IBMDocker $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{if .HitRate.TencentPhoto}}
+createLineChart('tencentPhotoChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.TencentPhoto $sizes}}, 'Hit Rate (%)', false);
+{{end}}
+{{end}}
+
+{{if .Throughput}}
+{{$threads := .Throughput.Threads}}
+{{if .Throughput.Results}}
+createLineChart('throughputChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.Results $threads}}, 'QPS');
+{{end}}
+{{if .Throughput.IntResults}}
+createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntResults $threads}}, 'QPS');
+{{end}}
+{{if .Throughput.GetOrSetResults}}
+createLineChart('throughputGetOrSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.GetOrSetResults $threads}}, 'QPS');
+{{end}}
+{{end}}
+}
+
+(function waitForChartAndDOM() {
+    if (typeof Chart !== 'undefined' && document.getElementById('cdnChart')) {
+        initCharts();
+    } else if (document.readyState === 'complete' && typeof Chart !== 'undefined') {
+        initCharts();
+    } else {
+        setTimeout(waitForChartAndDOM, 100);
+    }
+})();
+</script>
+
+<footer>
+    <a href="https://github.com/tstromberg/gocachemark">gocachemark</a> ·
+    Caches: <a href="https://github.com/codeGROOVE-dev/multicache">multicache</a>,
+    <a href="https://github.com/maypok86/otter">otter</a>,
+    <a href="https://github.com/dgraph-io/ristretto">ristretto</a>,
+    <a href="https://github.com/coocood/freecache">freecache</a>,
+    <a href="https://github.com/hashicorp/golang-lru">lru</a>,
+    <a href="https://github.com/Yiling-J/theine-go">theine</a>,
+    <a href="https://github.com/cespare/xxhash">tinylfu</a>,
+    <a href="https://github.com/jellydator/ttlcache">ttlcache</a>
+</footer>
+
+</body>
+</html>

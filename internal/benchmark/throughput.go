@@ -31,6 +31,22 @@ const (
 	getOrSetValueSize      = 8 * 1024 // 8KB for GetOrSet
 )
 
+// waitForOps waits for workers to finish and returns QPS, or 0 if timeout.
+func waitForOps(wg *sync.WaitGroup, ops *atomic.Int64) float64 {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		return 0
+	}
+}
+
 // RunGetOrSetThroughput benchmarks GetOrSet throughput at various thread counts.
 // Uses URL-like keys for realistic cache workloads.
 func RunGetOrSetThroughput(threadCounts []int) []ThroughputResult {
@@ -125,19 +141,7 @@ func measureGetOrSetQPS(factory cache.Factory, keys []string, threads int) float
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		return 0
-	}
+	return waitForOps(&wg, &ops)
 }
 
 // RunStringGetThroughput benchmarks Get throughput with string keys.
@@ -263,19 +267,7 @@ func measureStringGetQPS(factory cache.Factory, keys []int, threads int) float64
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		return 0
-	}
+	return waitForOps(&wg, &ops)
 }
 
 func measureStringSetQPS(factory cache.Factory, keys []int, threads int) float64 {
@@ -321,19 +313,7 @@ func measureStringSetQPS(factory cache.Factory, keys []int, threads int) float64
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		return 0
-	}
+	return waitForOps(&wg, &ops)
 }
 
 func measureIntGetQPS(factory cache.IntFactory, keys []int, threads int) float64 {
@@ -367,19 +347,7 @@ func measureIntGetQPS(factory cache.IntFactory, keys []int, threads int) float64
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		return 0
-	}
+	return waitForOps(&wg, &ops)
 }
 
 func measureIntSetQPS(factory cache.IntFactory, keys []int, threads int) float64 {
@@ -414,17 +382,5 @@ func measureIntSetQPS(factory cache.IntFactory, keys []int, threads int) float64
 
 	time.Sleep(benchmarkDuration)
 	stop.Store(true)
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		return 0
-	}
+	return waitForOps(&wg, &ops)
 }

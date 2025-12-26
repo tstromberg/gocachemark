@@ -29,6 +29,48 @@ var threadCounts []int
 // validSuites lists all available benchmark suites.
 var validSuites = []string{"hitrate", "latency", "throughput", "memory"}
 
+// parseIntList parses a comma-separated string of integers with optional multiplier.
+func parseIntList(input string, multiplier int) []int {
+	var result []int
+	for s := range strings.SplitSeq(input, ",") {
+		s = strings.TrimSpace(s)
+		var value int
+		if _, err := fmt.Sscanf(s, "%d", &value); err == nil {
+			result = append(result, value*multiplier)
+		}
+	}
+	return result
+}
+
+// printLatencyTable prints a formatted latency results table with winner.
+func printLatencyTable(results []benchmark.LatencyResult) {
+	avgLatency := func(r benchmark.LatencyResult) float64 {
+		return (r.GetNsOp + r.SetNsOp) / 2
+	}
+
+	sorted := make([]benchmark.LatencyResult, len(results))
+	copy(sorted, results)
+	sort.Slice(sorted, func(i, j int) bool {
+		return avgLatency(sorted[i]) < avgLatency(sorted[j])
+	})
+
+	fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |")
+	fmt.Println("  |---------------|--------|-----------|--------|-----------|-------------|----------------|--------|")
+
+	for _, r := range sorted {
+		fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
+			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
+	}
+
+	if len(sorted) >= 2 {
+		best := sorted[0]
+		second := sorted[1]
+		pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
+		fmt.Printf("\n  winner: %s (%.0f ns avg, %s is %.1f%% slower)\n", best.Name, avgLatency(best), second.Name, pct)
+	}
+	fmt.Println()
+}
+
 // validTests lists all available test names.
 var validTests = []string{
 	// hitrate
@@ -44,7 +86,6 @@ var validTests = []string{
 // suiteFilter holds which suites to run.
 var suiteFilter map[string]bool
 
-//nolint:gocognit // main entry point handles CLI parsing and orchestration
 func main() {
 	showHelp := flag.Bool("help", false, "Show help message")
 	suites := flag.String("suites", "all", "Comma-separated list of benchmark suites: hitrate,latency,throughput,memory (default: all)")
@@ -79,9 +120,9 @@ func main() {
 
 	// Apply cache filter
 	if *caches != "" {
-		names := strings.Split(*caches, ",")
-		for i, name := range names {
-			names[i] = strings.TrimSpace(name)
+		var names []string
+		for name := range strings.SplitSeq(*caches, ",") {
+			names = append(names, strings.TrimSpace(name))
 		}
 		cache.SetFilter(names)
 	}
@@ -112,27 +153,13 @@ func main() {
 	// Apply cache sizes
 	cacheSizes = benchmark.DefaultCacheSizes
 	if *sizes != "" {
-		cacheSizes = nil
-		for s := range strings.SplitSeq(*sizes, ",") {
-			s = strings.TrimSpace(s)
-			var size int
-			if _, err := fmt.Sscanf(s, "%d", &size); err == nil {
-				cacheSizes = append(cacheSizes, size*1024)
-			}
-		}
+		cacheSizes = parseIntList(*sizes, 1024)
 	}
 
 	// Apply thread counts
 	threadCounts = benchmark.DefaultThreadCounts
 	if *threads != "" {
-		threadCounts = nil
-		for t := range strings.SplitSeq(*threads, ",") {
-			t = strings.TrimSpace(t)
-			var count int
-			if _, err := fmt.Sscanf(t, "%d", &count); err == nil {
-				threadCounts = append(threadCounts, count)
-			}
-		}
+		threadCounts = parseIntList(*threads, 1)
 	}
 
 	printHeader()
@@ -464,32 +491,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 		printTest("string", "string key Get/Set operations")
 		results := benchmark.RunLatency()
 		data.Results = results
-
-		avgLatency := func(r benchmark.LatencyResult) float64 {
-			return (r.GetNsOp + r.SetNsOp) / 2
-		}
-
-		sorted := make([]benchmark.LatencyResult, len(results))
-		copy(sorted, results)
-		sort.Slice(sorted, func(i, j int) bool {
-			return avgLatency(sorted[i]) < avgLatency(sorted[j])
-		})
-
-		fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |")
-		fmt.Println("  |---------------|--------|-----------|--------|-----------|-------------|----------------|--------|")
-
-		for _, r := range sorted {
-			fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
-				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
-		}
-
-		if len(sorted) >= 2 {
-			best := sorted[0]
-			second := sorted[1]
-			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
-			fmt.Printf("\n  winner: %s (%.0f ns avg, %s is %.1f%% slower)\n", best.Name, avgLatency(best), second.Name, pct)
-		}
-		fmt.Println()
+		printLatencyTable(results)
 	}
 
 	if shouldRunTest("getorset") {
@@ -528,32 +530,7 @@ func runLatencyBenchmarks() *output.LatencyData {
 		printTest("int", "int key Get/Set operations")
 		results := benchmark.RunIntLatency()
 		data.IntResults = results
-
-		avgLatency := func(r benchmark.LatencyResult) float64 {
-			return (r.GetNsOp + r.SetNsOp) / 2
-		}
-
-		sorted := make([]benchmark.LatencyResult, len(results))
-		copy(sorted, results)
-		sort.Slice(sorted, func(i, j int) bool {
-			return avgLatency(sorted[i]) < avgLatency(sorted[j])
-		})
-
-		fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | Avg ns |")
-		fmt.Println("  |---------------|--------|-----------|--------|-----------|--------|")
-
-		for _, r := range sorted {
-			fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %6.0f |\n",
-				r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, avgLatency(r))
-		}
-
-		if len(sorted) >= 2 {
-			best := sorted[0]
-			second := sorted[1]
-			pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
-			fmt.Printf("\n  winner: %s (%.0f ns avg, %s is %.1f%% slower)\n", best.Name, avgLatency(best), second.Name, pct)
-		}
-		fmt.Println()
+		printLatencyTable(results)
 	}
 
 	return data

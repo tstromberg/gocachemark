@@ -168,18 +168,19 @@ func main() {
 	}
 
 	// Determine output paths
-	var htmlPath, mdPath string
+	var htmlPath, mdPath, jsonPath string
 	if *outDir != "" {
 		if err := os.MkdirAll(*outDir, 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating output directory: %v\n", err)
 			os.Exit(1)
 		}
-		htmlPath = filepath.Join(*outDir, "cachemark_results.html")
-		mdPath = filepath.Join(*outDir, "cachemark_results.md")
+		htmlPath = filepath.Join(*outDir, "gocachemark_results.html")
+		mdPath = filepath.Join(*outDir, "gocachemark_results.md")
+		jsonPath = filepath.Join(*outDir, "gocachemark_results.json")
 	} else if *htmlOut != "" {
 		htmlPath = *htmlOut
 	} else {
-		htmlPath = filepath.Join(os.TempDir(), "cachemark_results.html")
+		htmlPath = filepath.Join(os.TempDir(), "gocachemark_results.html")
 	}
 
 	if err := output.WriteHTML(htmlPath, results, commandLine); err != nil {
@@ -194,6 +195,14 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("         %s\n", mdPath)
+	}
+
+	if jsonPath != "" {
+		if err := output.WriteJSON(jsonPath, results, commandLine); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing JSON: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("         %s\n", jsonPath)
 	}
 
 	if *openHTML {
@@ -217,7 +226,7 @@ func printUsage() {
 	fmt.Println("  -caches <list>   Comma-separated caches to benchmark (default: all)")
 	fmt.Println("  -sizes <list>    Comma-separated cache sizes in K (default: 16,32,64,128,256)")
 	fmt.Println("  -threads <list>  Comma-separated thread counts for throughput (default: 1,8,16,32)")
-	fmt.Println("  -outdir <dir>    Output directory for cachemark_results.html and .md")
+	fmt.Println("  -outdir <dir>    Output directory for gocachemark_results.{html,md,json}")
 	fmt.Println("  -html <file>     Output results to HTML file (default: temp dir)")
 	fmt.Println("  -open            Open HTML report in web browser after generation")
 	fmt.Println()

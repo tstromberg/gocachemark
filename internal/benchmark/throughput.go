@@ -24,7 +24,7 @@ const (
 	ThroughputCacheSize    = 65536 // 64K - realistic cache size for multi-threaded benchmarks
 	throughputWorkloadSize = 1_000_000
 	throughputAlpha        = 0.8
-	benchmarkDuration      = 600 * time.Millisecond
+	benchmarkDuration      = 900 * time.Millisecond
 	opsBatchSize           = 1000
 	throughputValueSize    = 4 * 1024  // 4KB for regular throughput
 	getOrSetValueSize      = 8 * 1024  // 8KB for GetOrSet

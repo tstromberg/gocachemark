@@ -114,6 +114,15 @@ func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.
 		}
 		w(" %5.2f%% |\n", avgHitRate(r, sizes))
 	}
+
+	// Winner line
+	if len(sorted) >= 2 {
+		best, second := sorted[0], sorted[1]
+		bestAvg := avgHitRate(best, sizes)
+		secondAvg := avgHitRate(second, sizes)
+		pct := ((bestAvg - secondAvg) / secondAvg) * 100
+		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	}
 	w("\n")
 }
 
@@ -136,6 +145,15 @@ func writeLatencyMarkdown(w func(string, ...any), data []benchmark.LatencyResult
 		avg := (r.GetNsOp + r.SetNsOp) / 2
 		w("| %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avg)
+	}
+
+	// Winner line
+	if len(sorted) >= 2 {
+		best, second := sorted[0], sorted[1]
+		bestAvg := (best.GetNsOp + best.SetNsOp) / 2
+		secondAvg := (second.GetNsOp + second.SetNsOp) / 2
+		pct := ((secondAvg - bestAvg) / bestAvg) * 100
+		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
 	}
 	w("\n")
 }
@@ -160,6 +178,15 @@ func writeIntLatencyMarkdown(w func(string, ...any), data []benchmark.IntLatency
 		w("| %-13s | %6.0f | %9d | %6.0f | %9d | %6.0f |\n",
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, avg)
 	}
+
+	// Winner line
+	if len(sorted) >= 2 {
+		best, second := sorted[0], sorted[1]
+		bestAvg := (best.GetNsOp + best.SetNsOp) / 2
+		secondAvg := (second.GetNsOp + second.SetNsOp) / 2
+		pct := ((secondAvg - bestAvg) / bestAvg) * 100
+		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	}
 	w("\n")
 }
 
@@ -180,6 +207,13 @@ func writeGetOrSetLatencyMarkdown(w func(string, ...any), data []benchmark.GetOr
 
 	for _, r := range sorted {
 		w("| %-13s | %11.0f | %14d |\n", r.Name, r.NsOp, r.Allocs)
+	}
+
+	// Winner line
+	if len(sorted) >= 2 {
+		best, second := sorted[0], sorted[1]
+		pct := ((second.NsOp - best.NsOp) / best.NsOp) * 100
+		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
 	}
 	w("\n")
 }
@@ -230,16 +264,36 @@ func writeThroughputMarkdown(w func(string, ...any), name string, data []benchma
 			w(" %6.0fK   |\n", avg/1_000)
 		}
 	}
+
+	// Winner line
+	if len(sorted) >= 2 {
+		best, second := sorted[0], sorted[1]
+		bestAvg := avgQPS(best)
+		secondAvg := avgQPS(second)
+		pct := ((bestAvg - secondAvg) / secondAvg) * 100
+		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	}
 	w("\n")
 }
 
 func writeMemoryMarkdown(w func(string, ...any), data []benchmark.MemoryResult) {
+	if len(data) == 0 {
+		return
+	}
+
 	w("| Cache         | Items Stored | Memory (MB) | Overhead (bytes/item) |\n")
 	w("|---------------|--------------|-------------|-----------------------|\n")
 
 	for _, r := range data {
 		mb := float64(r.Bytes) / 1024 / 1024
 		w("| %-13s | %12d | %11.2f | %21d |\n", r.Name, r.Items, mb, r.BytesPerItem)
+	}
+
+	// Winner line (lowest memory usage)
+	if len(data) >= 2 {
+		best, second := data[0], data[1]
+		pct := (float64(second.Bytes-best.Bytes) / float64(best.Bytes)) * 100
+		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
 	}
 	w("\n")
 }

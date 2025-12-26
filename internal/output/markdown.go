@@ -249,12 +249,18 @@ func writeMemoryMarkdown(w func(string, ...any), data []benchmark.MemoryResult) 
 		return
 	}
 
-	w("| Cache         | Items Stored | Memory (MB) | Overhead (bytes/item) |\n")
-	w("|---------------|--------------|-------------|-----------------------|\n")
+	// Show baseline for reference
+	if len(data) > 0 && data[0].BaselineBytes > 0 {
+		baselineMB := float64(data[0].BaselineBytes) / 1024 / 1024
+		w("Baseline (map[string][]byte): %.2f MB\n\n", baselineMB)
+	}
+
+	w("| Cache         | Items Stored | Memory (MB) | Overhead vs map (bytes/item) |\n")
+	w("|---------------|--------------|-------------|------------------------------|\n")
 
 	for _, r := range data {
 		mb := float64(r.Bytes) / 1024 / 1024
-		w("| %-13s | %12d | %11.2f | %21d |\n", r.Name, r.Items, mb, r.BytesPerItem)
+		w("| %-13s | %12d | %11.2f | %28d |\n", r.Name, r.Items, mb, r.BytesPerItem)
 	}
 
 	// Winner line (lowest memory usage)

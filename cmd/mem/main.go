@@ -40,7 +40,7 @@ func main() {
 	runtime.GC() //nolint:revive // intentional GC for memory measurement
 	debug.FreeOSMemory()
 
-	items := runBenchmark(*cacheName, *capacity, *valSize)
+	items, data := runBenchmark(*cacheName, *capacity, *valSize)
 
 	runtime.GC() //nolint:revive // intentional GC for memory measurement
 	time.Sleep(100 * time.Millisecond)
@@ -50,10 +50,14 @@ func main() {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
+	// Keep data alive until after measurement
+	runtime.KeepAlive(data)
+
 	fmt.Printf(`{"name":%q, "items":%d, "bytes":%d}`, *cacheName, items, mem.Alloc)
 }
 
-func runBenchmark(name string, capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional for memory measurement
+func runBenchmark(name string, capacity, valSize int) (int, any) {
 	switch name {
 	case "baseline":
 		return runBaseline(capacity, valSize)
@@ -88,51 +92,69 @@ func runBenchmark(name string, capacity, valSize int) int {
 	case "ttlcache":
 		return runTTLCache(capacity, valSize)
 	default:
-		return 0
+		return 0, nil
 	}
 }
 
-func runBaseline(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runBaseline(capacity, valSize int) (int, any) {
 	m := make(map[string][]byte, capacity)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		m[key] = make([]byte, valSize)
+		val := make([]byte, valSize)
+		// Write data to force actual memory allocation (avoid zero-page optimization)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		m[key] = val
 	}
-	runtime.KeepAlive(m)
-	return len(m)
+	return len(m), m
 }
 
-func runMulticache(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runMulticache(capacity, valSize int) (int, any) {
 	c := multicache.New[string, []byte](multicache.Size(capacity))
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runOtter(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runOtter(capacity, valSize int) (int, any) {
 	c := otter.Must(&otter.Options[string, []byte]{MaximumSize: capacity})
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.EstimatedSize()
+	return c.EstimatedSize(), c
 }
 
-func runTheine(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runTheine(capacity, valSize int) (int, any) {
 	c, _ := theine.NewBuilder[string, []byte](int64(capacity)).Build() //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize), 0)
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val, 0)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runRistretto(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runRistretto(capacity, valSize int) (int, any) {
 	c, _ := ristretto.NewCache(&ristretto.Config{ //nolint:errcheck // capacity always valid
 		NumCounters:        int64(capacity * 10),
 		MaxCost:            int64(capacity),
@@ -144,7 +166,11 @@ func runRistretto(capacity, valSize int) int {
 	for pass := range 3 {
 		for i := range capacity {
 			key := "key-" + strconv.Itoa(i)
-			c.Set(key, make([]byte, valSize), 1)
+			val := make([]byte, valSize)
+			for j := range val {
+				val[j] = byte(i + j)
+			}
+			c.Set(key, val, 1)
 			if pass > 0 {
 				c.Get(key)
 			}
@@ -152,8 +178,6 @@ func runRistretto(capacity, valSize int) int {
 		c.Wait()
 	}
 
-	runtime.KeepAlive(c)
-
 	count := 0
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -161,22 +185,26 @@ func runRistretto(capacity, valSize int) int {
 			count++
 		}
 	}
-	return count
+	return count, c
 }
 
 type tinyLFUWrapper struct {
 	c *tinylfu.T
 }
 
-func runTinyLFU(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runTinyLFU(capacity, valSize int) (int, any) {
 	// Use non-sync version - SyncT has issues with admission
 	c := tinylfu.New(capacity, capacity*10)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(&tinylfu.Item{Key: key, Value: make([]byte, valSize)})
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(&tinylfu.Item{Key: key, Value: val})
 	}
 	w := &tinyLFUWrapper{c: c}
-	runtime.KeepAlive(w)
 
 	count := 0
 	for i := range capacity {
@@ -185,118 +213,157 @@ func runTinyLFU(capacity, valSize int) int {
 			count++
 		}
 	}
-	return count
+	return count, w
 }
 
-func runSieve(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runSieve(capacity, valSize int) (int, any) {
 	c := sieve.New[string, []byte](capacity, 0)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runS3FIFO(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runS3FIFO(capacity, valSize int) (int, any) {
 	c := s3fifo.New[string, []byte](capacity, 0)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
 func hashString(s string) uint32 {
 	return uint32(xxh3.HashString(s)) //nolint:gosec // safe truncation
 }
 
-func runFreeLRUSharded(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runFreeLRUSharded(capacity, valSize int) (int, any) {
 	c, _ := freelru.NewSharded[string, []byte](uint32(capacity), hashString) //nolint:errcheck,gosec // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Add(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Add(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runFreeLRUSynced(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runFreeLRUSynced(capacity, valSize int) (int, any) {
 	c, _ := freelru.NewSynced[string, []byte](uint32(capacity), hashString) //nolint:errcheck,gosec // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Add(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Add(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runFreecache(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runFreecache(capacity, valSize int) (int, any) {
 	overhead := 256
 	size := capacity * (valSize + overhead)
 	c := freecache.NewCache(size)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set([]byte(key), make([]byte, valSize), 0) //nolint:errcheck,gosec // best-effort set
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set([]byte(key), val, 0) //nolint:errcheck,gosec // best-effort set
 	}
-	runtime.KeepAlive(c)
-	return int(c.EntryCount())
+	return int(c.EntryCount()), c
 }
 
-func runTwoQueue(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runTwoQueue(capacity, valSize int) (int, any) {
 	c, _ := lru2.New2Q[string, []byte](capacity) //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Add(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Add(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runS4LRU(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runS4LRU(capacity, valSize int) (int, any) {
 	// s4lru divides capacity across 4 segments, so multiply by 4
 	c := s4lru.New(capacity * 4)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runClock(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runClock(capacity, valSize int) (int, any) {
 	c := clock.NewCache[string, []byte](clock.WithCapacity(capacity))
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runLRU(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runLRU(capacity, valSize int) (int, any) {
 	c, _ := lru2.New[string, []byte](capacity) //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Add(key, make([]byte, valSize))
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Add(key, val)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }
 
-func runTTLCache(capacity, valSize int) int {
+//nolint:gocritic // unnamed results and eval order are intentional
+func runTTLCache(capacity, valSize int) (int, any) {
 	c := ttlcache.New[string, []byte](
 		ttlcache.WithCapacity[string, []byte](uint64(capacity)),
 		ttlcache.WithTTL[string, []byte](time.Hour),
 	)
 	go c.Start()
-	defer c.Stop()
 
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set(key, make([]byte, valSize), ttlcache.DefaultTTL)
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(key, val, ttlcache.DefaultTTL)
 	}
-	runtime.KeepAlive(c)
-	return c.Len()
+	return c.Len(), c
 }

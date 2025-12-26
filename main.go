@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/tstromberg/gocachemark/internal/benchmark"
 	"github.com/tstromberg/gocachemark/internal/cache"
@@ -37,7 +36,7 @@ var validTests = []string{
 	// latency
 	"string", "int", "getorset",
 	// throughput
-	"string-throughput", "int-throughput", "getorset-throughput",
+	"string-get-throughput", "string-set-throughput", "int-get-throughput", "int-set-throughput", "getorset-throughput",
 	// memory
 	"memory",
 }
@@ -49,6 +48,7 @@ func main() {
 	showHelp := flag.Bool("help", false, "Show help message")
 	suites := flag.String("suites", "all", "Comma-separated list of benchmark suites: hitrate,latency,throughput,memory (default: all)")
 	htmlOut := flag.String("html", "", "Output results to HTML file (e.g., results.html)")
+	outDir := flag.String("outdir", "", "Output directory for results (writes results.html and results.md)")
 	openHTML := flag.Bool("open", false, "Open HTML report in web browser after generation")
 	caches := flag.String("caches", "", "Comma-separated list of caches to benchmark (default: all)")
 	tests := flag.String("tests", "", "Comma-separated list of tests to run across suites (default: all)")
@@ -157,20 +157,44 @@ func main() {
 	results.Rankings, results.MedalTable = output.ComputeRankings(results)
 	printOverallRanking(results.Rankings)
 
-	htmlPath := *htmlOut
-	if htmlPath == "" {
-		timestamp := time.Now().Format("2006-01-02-150405")
-		htmlPath = filepath.Join(os.TempDir(), fmt.Sprintf("gocachemark-%s.html", timestamp))
+	// Build command line string and set machine info
+	commandLine := "gocachemark " + strings.Join(os.Args[1:], " ")
+	results.MachineInfo = output.MachineInfo{
+		OS:          runtime.GOOS,
+		Arch:        runtime.GOARCH,
+		NumCPU:      runtime.NumCPU(),
+		GoVersion:   runtime.Version(),
+		CommandLine: commandLine,
 	}
 
-	// Build command line string
-	commandLine := "gocachemark " + strings.Join(os.Args[1:], " ")
+	// Determine output paths
+	var htmlPath, mdPath string
+	if *outDir != "" {
+		if err := os.MkdirAll(*outDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating output directory: %v\n", err)
+			os.Exit(1)
+		}
+		htmlPath = filepath.Join(*outDir, "cachemark_results.html")
+		mdPath = filepath.Join(*outDir, "cachemark_results.md")
+	} else if *htmlOut != "" {
+		htmlPath = *htmlOut
+	} else {
+		htmlPath = filepath.Join(os.TempDir(), "cachemark_results.html")
+	}
 
 	if err := output.WriteHTML(htmlPath, results, commandLine); err != nil {
 		fmt.Fprintf(os.Stderr, "Error writing HTML: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("Results: %s\n", htmlPath)
+
+	if mdPath != "" {
+		if err := output.WriteMarkdown(mdPath, results, commandLine); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing Markdown: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("         %s\n", mdPath)
+	}
 
 	if *openHTML {
 		if err := openBrowser(htmlPath); err != nil {
@@ -193,6 +217,7 @@ func printUsage() {
 	fmt.Println("  -caches <list>   Comma-separated caches to benchmark (default: all)")
 	fmt.Println("  -sizes <list>    Comma-separated cache sizes in K (default: 16,32,64,128,256)")
 	fmt.Println("  -threads <list>  Comma-separated thread counts for throughput (default: 1,8,16,32)")
+	fmt.Println("  -outdir <dir>    Output directory for cachemark_results.html and .md")
 	fmt.Println("  -html <file>     Output results to HTML file (default: temp dir)")
 	fmt.Println("  -open            Open HTML report in web browser after generation")
 	fmt.Println()
@@ -215,8 +240,10 @@ func printUsage() {
 	fmt.Println("    getorset                GetOrSet operations (URL keys)")
 	fmt.Println()
 	fmt.Println("  throughput - Multi-threaded throughput benchmarks (QPS)")
-	fmt.Println("    string-throughput       String keys, Zipf workload")
-	fmt.Println("    int-throughput          Int keys, Zipf workload")
+	fmt.Println("    string-get-throughput   String keys, Get only")
+	fmt.Println("    string-set-throughput   String keys, Set only")
+	fmt.Println("    int-get-throughput      Int keys, Get only")
+	fmt.Println("    int-set-throughput      Int keys, Set only")
 	fmt.Println("    getorset-throughput     GetOrSet operations (URL keys)")
 	fmt.Println()
 	fmt.Println("  memory - Memory overhead benchmarks (isolated processes)")
@@ -596,20 +623,10 @@ func runThroughputBenchmarks() *output.ThroughputData {
 		fmt.Println()
 	}
 
-	if shouldRunTest("string-throughput") {
-		printTest("string-throughput", "string keys, Zipf, 75% read / 25% write")
-		data.Results = benchmark.RunThroughput(threads)
-		printThroughputTable(data.Results)
-	}
-
-	if shouldRunTest("int-throughput") {
-		printTest("int-throughput", "int keys, Zipf, 75% read / 25% write")
-		data.IntResults = benchmark.RunIntThroughput(threads)
-		printThroughputTable(data.IntResults)
-	}
+	cacheSize := benchmark.ThroughputCacheSize / 1024 // Convert to K
 
 	if shouldRunTest("getorset-throughput") {
-		printTest("getorset-throughput", "GetOrSet operations (URL keys)")
+		printTest("getorset-throughput", fmt.Sprintf("GetOrSet operations (URL keys), %dK cache", cacheSize))
 		data.GetOrSetResults = benchmark.RunGetOrSetThroughput(threads)
 		if len(data.GetOrSetResults) > 0 {
 			printThroughputTable(data.GetOrSetResults)
@@ -617,6 +634,30 @@ func runThroughputBenchmarks() *output.ThroughputData {
 			fmt.Println("  (no caches with GetOrSet support)")
 			fmt.Println()
 		}
+	}
+
+	if shouldRunTest("string-get-throughput") {
+		printTest("string-get-throughput", fmt.Sprintf("string keys, Get only, Zipf, %dK cache", cacheSize))
+		data.StringGetResults = benchmark.RunStringGetThroughput(threads)
+		printThroughputTable(data.StringGetResults)
+	}
+
+	if shouldRunTest("string-set-throughput") {
+		printTest("string-set-throughput", fmt.Sprintf("string keys, Set only, Zipf, %dK cache", cacheSize))
+		data.StringSetResults = benchmark.RunStringSetThroughput(threads)
+		printThroughputTable(data.StringSetResults)
+	}
+
+	if shouldRunTest("int-get-throughput") {
+		printTest("int-get-throughput", fmt.Sprintf("int keys, Get only, Zipf, %dK cache", cacheSize))
+		data.IntGetResults = benchmark.RunIntGetThroughput(threads)
+		printThroughputTable(data.IntGetResults)
+	}
+
+	if shouldRunTest("int-set-throughput") {
+		printTest("int-set-throughput", fmt.Sprintf("int keys, Set only, Zipf, %dK cache", cacheSize))
+		data.IntSetResults = benchmark.RunIntSetThroughput(threads)
+		printThroughputTable(data.IntSetResults)
 	}
 
 	return data

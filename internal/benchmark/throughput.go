@@ -21,181 +21,14 @@ type ThroughputResult struct {
 var DefaultThreadCounts = []int{1, 8, 16, 32}
 
 const (
-	throughputCacheSize    = 32768 // 32K - realistic cache size for multi-threaded benchmarks
+	ThroughputCacheSize    = 65536 // 64K - realistic cache size for multi-threaded benchmarks
 	throughputWorkloadSize = 1_000_000
 	throughputAlpha        = 0.8
-	benchmarkDuration      = 1 * time.Second
+	benchmarkDuration      = 600 * time.Millisecond
 	opsBatchSize           = 1000
 	throughputValueSize    = 4 * 1024  // 4KB for regular throughput
 	getOrSetValueSize      = 8 * 1024  // 8KB for GetOrSet
 )
-
-// RunThroughput benchmarks throughput at various thread counts using Zipf workload (string keys).
-// Uses 75% reads / 25% writes pattern.
-func RunThroughput(threadCounts []int) []ThroughputResult {
-	keys := workload.GenerateZipfInt(throughputWorkloadSize, throughputCacheSize, throughputAlpha, 42)
-
-	results := make([]ThroughputResult, 0, len(cache.All()))
-	for _, factory := range cache.All() {
-		c := factory(throughputCacheSize)
-		name := c.Name()
-		c.Close()
-
-		qps := make(map[int]float64)
-		for _, threads := range threadCounts {
-			qps[threads] = measureQPS(factory, keys, threads)
-		}
-		results = append(results, ThroughputResult{Name: name, QPS: qps})
-	}
-
-	return results
-}
-
-// RunIntThroughput benchmarks throughput at various thread counts using Zipf workload (int keys).
-// Uses 75% reads / 25% writes pattern.
-func RunIntThroughput(threadCounts []int) []ThroughputResult {
-	keys := workload.GenerateZipfInt(throughputWorkloadSize, throughputCacheSize, throughputAlpha, 42)
-
-	results := make([]ThroughputResult, 0, len(cache.AllInt()))
-	for _, factory := range cache.AllInt() {
-		c := factory(throughputCacheSize)
-		name := c.Name()
-		c.Close()
-
-		qps := make(map[int]float64)
-		for _, threads := range threadCounts {
-			qps[threads] = measureIntQPS(factory, keys, threads)
-		}
-		results = append(results, ThroughputResult{Name: name, QPS: qps})
-	}
-
-	return results
-}
-
-func measureQPS(factory cache.Factory, keys []int, threads int) float64 {
-	c := factory(throughputCacheSize)
-	defer c.Close()
-
-	// Pre-convert keys to strings and generate 4KB values
-	keyStrs := make([]string, throughputCacheSize)
-	values := make([]string, throughputCacheSize)
-	baseValue := make([]byte, throughputValueSize)
-	for i := range baseValue {
-		baseValue[i] = byte('A' + (i % 26))
-	}
-	for i := range throughputCacheSize {
-		keyStrs[i] = strconv.Itoa(i)
-		values[i] = string(baseValue)
-	}
-
-	// Pre-populate cache
-	for i := range throughputCacheSize {
-		c.Set(keyStrs[i], values[i])
-	}
-
-	var ops atomic.Int64
-	var stop atomic.Bool
-	var wg sync.WaitGroup
-
-	workloadLen := len(keys)
-
-	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; ; {
-				for range opsBatchSize {
-					idx := keys[i%workloadLen]
-					key := keyStrs[idx]
-					if i%4 == 0 { // 25% writes
-						c.Set(key, values[idx])
-					} else { // 75% reads
-						c.Get(key)
-					}
-					i++
-				}
-				ops.Add(opsBatchSize)
-				if stop.Load() {
-					return
-				}
-			}
-		}()
-	}
-
-	time.Sleep(benchmarkDuration)
-	stop.Store(true)
-
-	// Wait with timeout to detect hangs
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		// Benchmark hung - return 0 to indicate failure
-		return 0
-	}
-}
-
-func measureIntQPS(factory cache.IntFactory, keys []int, threads int) float64 {
-	c := factory(throughputCacheSize)
-	defer c.Close()
-
-	// Pre-populate cache
-	for i := range throughputCacheSize {
-		c.Set(i, i)
-	}
-
-	var ops atomic.Int64
-	var stop atomic.Bool
-	var wg sync.WaitGroup
-
-	workloadLen := len(keys)
-
-	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; ; {
-				for range opsBatchSize {
-					key := keys[i%workloadLen]
-					if i%4 == 0 { // 25% writes
-						c.Set(key, key)
-					} else { // 75% reads
-						c.Get(key)
-					}
-					i++
-				}
-				ops.Add(opsBatchSize)
-				if stop.Load() {
-					return
-				}
-			}
-		}()
-	}
-
-	time.Sleep(benchmarkDuration)
-	stop.Store(true)
-
-	// Wait with timeout to detect hangs
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return float64(ops.Load()) / benchmarkDuration.Seconds()
-	case <-time.After(5 * time.Second):
-		// Benchmark hung - return 0 to indicate failure
-		return 0
-	}
-}
 
 // RunGetOrSetThroughput benchmarks GetOrSet throughput at various thread counts.
 // Uses URL-like keys for realistic cache workloads.
@@ -204,7 +37,7 @@ func RunGetOrSetThroughput(threadCounts []int) []ThroughputResult {
 
 	results := make([]ThroughputResult, 0)
 	for _, factory := range cache.All() {
-		c := factory(throughputCacheSize)
+		c := factory(ThroughputCacheSize)
 		_, hasGetOrSet := c.(cache.GetOrSetCache)
 		name := c.Name()
 		c.Close()
@@ -233,7 +66,7 @@ func generateThroughputURLKeys(n int) []string {
 	}
 
 	// Generate Zipf-distributed indices
-	indices := workload.GenerateZipfInt(n, throughputCacheSize, throughputAlpha, 42)
+	indices := workload.GenerateZipfInt(n, ThroughputCacheSize, throughputAlpha, 42)
 
 	keys := make([]string, n)
 	for i, idx := range indices {
@@ -244,7 +77,7 @@ func generateThroughputURLKeys(n int) []string {
 }
 
 func measureGetOrSetQPS(factory cache.Factory, keys []string, threads int) float64 {
-	c := factory(throughputCacheSize)
+	c := factory(ThroughputCacheSize)
 	defer c.Close()
 
 	gosCache, ok := c.(cache.GetOrSetCache)
@@ -253,18 +86,18 @@ func measureGetOrSetQPS(factory cache.Factory, keys []string, threads int) float
 	}
 
 	// Generate 8KB values
-	values := make([]string, throughputCacheSize)
+	values := make([]string, ThroughputCacheSize)
 	baseValue := make([]byte, getOrSetValueSize)
 	for i := range baseValue {
 		baseValue[i] = byte('A' + (i % 26))
 	}
-	for i := range throughputCacheSize {
+	for i := range ThroughputCacheSize {
 		values[i] = string(baseValue)
 	}
 
 	// Pre-populate half the cache to test both hit and miss cases
-	for i := 0; i < len(keys)/2 && i < throughputCacheSize; i++ {
-		gosCache.Set(keys[i], values[i%throughputCacheSize])
+	for i := 0; i < len(keys)/2 && i < ThroughputCacheSize; i++ {
+		gosCache.Set(keys[i], values[i%ThroughputCacheSize])
 	}
 
 	var ops atomic.Int64
@@ -280,7 +113,304 @@ func measureGetOrSetQPS(factory cache.Factory, keys []string, threads int) float
 			for i := 0; ; {
 				for range opsBatchSize {
 					key := keys[i%workloadLen]
-					gosCache.GetOrSet(key, values[i%throughputCacheSize])
+					gosCache.GetOrSet(key, values[i%ThroughputCacheSize])
+					i++
+				}
+				ops.Add(opsBatchSize)
+				if stop.Load() {
+					return
+				}
+			}
+		}()
+	}
+
+	time.Sleep(benchmarkDuration)
+	stop.Store(true)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		return 0
+	}
+}
+
+// RunStringGetThroughput benchmarks Get throughput with string keys.
+func RunStringGetThroughput(threadCounts []int) []ThroughputResult {
+	keys := workload.GenerateZipfInt(throughputWorkloadSize, ThroughputCacheSize, throughputAlpha, 42)
+
+	results := make([]ThroughputResult, 0, len(cache.All()))
+	for _, factory := range cache.All() {
+		c := factory(ThroughputCacheSize)
+		name := c.Name()
+		c.Close()
+
+		qps := make(map[int]float64)
+		for _, threads := range threadCounts {
+			qps[threads] = measureStringGetQPS(factory, keys, threads)
+		}
+		results = append(results, ThroughputResult{Name: name, QPS: qps})
+	}
+
+	return results
+}
+
+// RunStringSetThroughput benchmarks Set throughput with string keys.
+func RunStringSetThroughput(threadCounts []int) []ThroughputResult {
+	keys := workload.GenerateZipfInt(throughputWorkloadSize, ThroughputCacheSize, throughputAlpha, 42)
+
+	results := make([]ThroughputResult, 0, len(cache.All()))
+	for _, factory := range cache.All() {
+		c := factory(ThroughputCacheSize)
+		name := c.Name()
+		c.Close()
+
+		qps := make(map[int]float64)
+		for _, threads := range threadCounts {
+			qps[threads] = measureStringSetQPS(factory, keys, threads)
+		}
+		results = append(results, ThroughputResult{Name: name, QPS: qps})
+	}
+
+	return results
+}
+
+// RunIntGetThroughput benchmarks Get throughput with int keys.
+func RunIntGetThroughput(threadCounts []int) []ThroughputResult {
+	keys := workload.GenerateZipfInt(throughputWorkloadSize, ThroughputCacheSize, throughputAlpha, 42)
+
+	results := make([]ThroughputResult, 0, len(cache.AllInt()))
+	for _, factory := range cache.AllInt() {
+		c := factory(ThroughputCacheSize)
+		name := c.Name()
+		c.Close()
+
+		qps := make(map[int]float64)
+		for _, threads := range threadCounts {
+			qps[threads] = measureIntGetQPS(factory, keys, threads)
+		}
+		results = append(results, ThroughputResult{Name: name, QPS: qps})
+	}
+
+	return results
+}
+
+// RunIntSetThroughput benchmarks Set throughput with int keys.
+func RunIntSetThroughput(threadCounts []int) []ThroughputResult {
+	keys := workload.GenerateZipfInt(throughputWorkloadSize, ThroughputCacheSize, throughputAlpha, 42)
+
+	results := make([]ThroughputResult, 0, len(cache.AllInt()))
+	for _, factory := range cache.AllInt() {
+		c := factory(ThroughputCacheSize)
+		name := c.Name()
+		c.Close()
+
+		qps := make(map[int]float64)
+		for _, threads := range threadCounts {
+			qps[threads] = measureIntSetQPS(factory, keys, threads)
+		}
+		results = append(results, ThroughputResult{Name: name, QPS: qps})
+	}
+
+	return results
+}
+
+func measureStringGetQPS(factory cache.Factory, keys []int, threads int) float64 {
+	c := factory(ThroughputCacheSize)
+	defer c.Close()
+
+	keyStrs := make([]string, ThroughputCacheSize)
+	values := make([]string, ThroughputCacheSize)
+	baseValue := make([]byte, throughputValueSize)
+	for i := range baseValue {
+		baseValue[i] = byte('A' + (i % 26))
+	}
+	for i := range ThroughputCacheSize {
+		keyStrs[i] = strconv.Itoa(i)
+		values[i] = string(baseValue)
+	}
+
+	for i := range ThroughputCacheSize {
+		c.Set(keyStrs[i], values[i])
+	}
+
+	var ops atomic.Int64
+	var stop atomic.Bool
+	var wg sync.WaitGroup
+
+	workloadLen := len(keys)
+
+	for range threads {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; ; {
+				for range opsBatchSize {
+					idx := keys[i%workloadLen]
+					c.Get(keyStrs[idx])
+					i++
+				}
+				ops.Add(opsBatchSize)
+				if stop.Load() {
+					return
+				}
+			}
+		}()
+	}
+
+	time.Sleep(benchmarkDuration)
+	stop.Store(true)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		return 0
+	}
+}
+
+func measureStringSetQPS(factory cache.Factory, keys []int, threads int) float64 {
+	c := factory(ThroughputCacheSize)
+	defer c.Close()
+
+	keyStrs := make([]string, ThroughputCacheSize)
+	values := make([]string, ThroughputCacheSize)
+	baseValue := make([]byte, throughputValueSize)
+	for i := range baseValue {
+		baseValue[i] = byte('A' + (i % 26))
+	}
+	for i := range ThroughputCacheSize {
+		keyStrs[i] = strconv.Itoa(i)
+		values[i] = string(baseValue)
+	}
+
+	for i := range ThroughputCacheSize {
+		c.Set(keyStrs[i], values[i])
+	}
+
+	var ops atomic.Int64
+	var stop atomic.Bool
+	var wg sync.WaitGroup
+
+	workloadLen := len(keys)
+
+	for range threads {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; ; {
+				for range opsBatchSize {
+					idx := keys[i%workloadLen]
+					c.Set(keyStrs[idx], values[idx])
+					i++
+				}
+				ops.Add(opsBatchSize)
+				if stop.Load() {
+					return
+				}
+			}
+		}()
+	}
+
+	time.Sleep(benchmarkDuration)
+	stop.Store(true)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		return 0
+	}
+}
+
+func measureIntGetQPS(factory cache.IntFactory, keys []int, threads int) float64 {
+	c := factory(ThroughputCacheSize)
+	defer c.Close()
+
+	for i := range ThroughputCacheSize {
+		c.Set(i, i)
+	}
+
+	var ops atomic.Int64
+	var stop atomic.Bool
+	var wg sync.WaitGroup
+
+	workloadLen := len(keys)
+
+	for range threads {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; ; {
+				for range opsBatchSize {
+					c.Get(keys[i%workloadLen])
+					i++
+				}
+				ops.Add(opsBatchSize)
+				if stop.Load() {
+					return
+				}
+			}
+		}()
+	}
+
+	time.Sleep(benchmarkDuration)
+	stop.Store(true)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return float64(ops.Load()) / benchmarkDuration.Seconds()
+	case <-time.After(5 * time.Second):
+		return 0
+	}
+}
+
+func measureIntSetQPS(factory cache.IntFactory, keys []int, threads int) float64 {
+	c := factory(ThroughputCacheSize)
+	defer c.Close()
+
+	for i := range ThroughputCacheSize {
+		c.Set(i, i)
+	}
+
+	var ops atomic.Int64
+	var stop atomic.Bool
+	var wg sync.WaitGroup
+
+	workloadLen := len(keys)
+
+	for range threads {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; ; {
+				for range opsBatchSize {
+					key := keys[i%workloadLen]
+					c.Set(key, key)
 					i++
 				}
 				ops.Add(opsBatchSize)

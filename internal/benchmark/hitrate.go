@@ -57,7 +57,7 @@ func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runCDNTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
@@ -65,7 +65,9 @@ func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
 	return results, nil
 }
 
-func runCDNTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
+// runStringTrace runs a hit rate benchmark using string keys.
+// Used by CDN, Twitter, Wikipedia, Thesios, IBM Docker, and Tencent Photo traces.
+func runStringTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
 	c := factory(cacheSize)
 	defer c.Close()
 
@@ -176,28 +178,12 @@ func RunTwitterHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runTwitterTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
 
 	return results, nil
-}
-
-func runTwitterTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
-	c := factory(cacheSize)
-	defer c.Close()
-
-	var hits, misses int64
-	for _, key := range ops {
-		if _, ok := c.Get(key); ok {
-			hits++
-		} else {
-			misses++
-			c.Set(key, key)
-		}
-	}
-	return float64(hits) / float64(hits+misses) * 100
 }
 
 // RunWikipediaHitRate benchmarks hit rates using the Wikipedia CDN upload trace.
@@ -215,28 +201,12 @@ func RunWikipediaHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runWikipediaTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
 
 	return results, nil
-}
-
-func runWikipediaTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
-	c := factory(cacheSize)
-	defer c.Close()
-
-	var hits, misses int64
-	for _, key := range ops {
-		if _, ok := c.Get(key); ok {
-			hits++
-		} else {
-			misses++
-			c.Set(key, key)
-		}
-	}
-	return float64(hits) / float64(hits+misses) * 100
 }
 
 // RunThesiosBlockHitRate benchmarks hit rates using the Google Thesios I/O block trace.
@@ -254,28 +224,12 @@ func RunThesiosBlockHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runThesiosBlockTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
 
 	return results, nil
-}
-
-func runThesiosBlockTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
-	c := factory(cacheSize)
-	defer c.Close()
-
-	var hits, misses int64
-	for _, key := range ops {
-		if _, ok := c.Get(key); ok {
-			hits++
-		} else {
-			misses++
-			c.Set(key, key)
-		}
-	}
-	return float64(hits) / float64(hits+misses) * 100
 }
 
 // RunThesiosFileHitRate benchmarks hit rates using the Google Thesios I/O file trace.
@@ -293,28 +247,12 @@ func RunThesiosFileHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runThesiosFileTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
 
 	return results, nil
-}
-
-func runThesiosFileTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
-	c := factory(cacheSize)
-	defer c.Close()
-
-	var hits, misses int64
-	for _, key := range ops {
-		if _, ok := c.Get(key); ok {
-			hits++
-		} else {
-			misses++
-			c.Set(key, key)
-		}
-	}
-	return float64(hits) / float64(hits+misses) * 100
 }
 
 // RunIBMDockerHitRate benchmarks hit rates using the IBM Docker Registry trace.
@@ -332,28 +270,12 @@ func RunIBMDockerHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runIBMDockerTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
 
 	return results, nil
-}
-
-func runIBMDockerTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
-	c := factory(cacheSize)
-	defer c.Close()
-
-	var hits, misses int64
-	for _, key := range ops {
-		if _, ok := c.Get(key); ok {
-			hits++
-		} else {
-			misses++
-			c.Set(key, key)
-		}
-	}
-	return float64(hits) / float64(hits+misses) * 100
 }
 
 // RunTencentPhotoHitRate benchmarks hit rates using the Tencent Photo trace.
@@ -371,26 +293,10 @@ func RunTencentPhotoHitRate(sizes []int) ([]HitRateResult, error) {
 
 		rates := make(map[int]float64)
 		for _, size := range sizes {
-			rates[size] = runTencentPhotoTrace(factory, ops, size)
+			rates[size] = runStringTrace(factory, ops, size)
 		}
 		results = append(results, HitRateResult{Name: name, Rates: rates})
 	}
 
 	return results, nil
-}
-
-func runTencentPhotoTrace(factory cache.Factory, ops []string, cacheSize int) float64 {
-	c := factory(cacheSize)
-	defer c.Close()
-
-	var hits, misses int64
-	for _, key := range ops {
-		if _, ok := c.Get(key); ok {
-			hits++
-		} else {
-			misses++
-			c.Set(key, key)
-		}
-	}
-	return float64(hits) / float64(hits+misses) * 100
 }

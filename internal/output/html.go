@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"os"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -98,22 +97,18 @@ type LatencyData struct {
 
 // ThroughputData holds throughput benchmark data.
 type ThroughputData struct {
-	Results         []benchmark.ThroughputResult
-	IntResults      []benchmark.ThroughputResult
-	GetOrSetResults []benchmark.ThroughputResult
-	Threads         []int
+	StringGetResults []benchmark.ThroughputResult
+	StringSetResults []benchmark.ThroughputResult
+	IntGetResults    []benchmark.ThroughputResult
+	IntSetResults    []benchmark.ThroughputResult
+	GetOrSetResults  []benchmark.ThroughputResult
+	Threads          []int
 }
 
 // WriteHTML writes benchmark results to an HTML file.
 func WriteHTML(filename string, results Results, commandLine string) error {
 	results.Timestamp = time.Now().Format("2006-01-02 15:04:05 MST")
-	results.MachineInfo = MachineInfo{
-		OS:          runtime.GOOS,
-		Arch:        runtime.GOARCH,
-		NumCPU:      runtime.NumCPU(),
-		GoVersion:   runtime.Version(),
-		CommandLine: commandLine,
-	}
+	results.MachineInfo.CommandLine = commandLine
 
 	f, err := os.Create(filename)
 	if err != nil {

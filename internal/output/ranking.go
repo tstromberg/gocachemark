@@ -134,8 +134,10 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			name string
 			data []benchmark.ThroughputResult
 		}{
-			{"String Keys", results.Throughput.Results},
-			{"Int Keys", results.Throughput.IntResults},
+			{"String Get", results.Throughput.StringGetResults},
+			{"String Set", results.Throughput.StringSetResults},
+			{"Int Get", results.Throughput.IntGetResults},
+			{"Int Set", results.Throughput.IntSetResults},
 			{"GetOrSet", results.Throughput.GetOrSetResults},
 		}
 		for _, b := range throughputBenchmarks {

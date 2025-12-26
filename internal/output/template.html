@@ -964,15 +964,15 @@
         <span class="toggle-icon">▼</span>
     </div>
     <div class="section-content">
-        <p class="suite-description">Higher throughput means more queries per second (QPS). Tests measure concurrent performance with a Zipf workload (75% reads, 25% writes) across different thread counts.</p>
+        <p class="suite-description">Higher throughput means more queries per second (QPS). Tests measure concurrent Get and Set performance separately with a Zipf workload across different thread counts.</p>
 
     {{$threads := .Throughput.Threads}}
     {{$maxThreads := index $threads (len $threads | add -1)}}
 
-    {{if .Throughput.Results}}
-    <h3>String Keys</h3>
+    {{if .Throughput.StringGetResults}}
+    <h3>String Keys - Get</h3>
     <div class="line-chart-container">
-        <canvas id="throughputChart"></canvas>
+        <canvas id="throughputStringGetChart"></canvas>
     </div>
 
     <h4>Results Table</h4>
@@ -985,7 +985,7 @@
         </tr>
         </thead>
         <tbody>
-        {{range $r := sortByThroughput .Throughput.Results $threads}}
+        {{range $r := sortByThroughput .Throughput.StringGetResults $threads}}
         <tr>
             <td>{{$r.Name}}</td>
             {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
@@ -996,10 +996,10 @@
     </table>
     {{end}}
 
-    {{if .Throughput.IntResults}}
-    <h3 style="margin-top: 50px;">Int Keys</h3>
+    {{if .Throughput.StringSetResults}}
+    <h3 style="margin-top: 50px;">String Keys - Set</h3>
     <div class="line-chart-container">
-        <canvas id="throughputIntChart"></canvas>
+        <canvas id="throughputStringSetChart"></canvas>
     </div>
 
     <h4>Results Table</h4>
@@ -1012,7 +1012,61 @@
         </tr>
         </thead>
         <tbody>
-        {{range $r := sortByThroughput .Throughput.IntResults $threads}}
+        {{range $r := sortByThroughput .Throughput.StringSetResults $threads}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
+            <td style="font-weight:bold;">{{qps (avgQPS $r)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Throughput.IntGetResults}}
+    <h3 style="margin-top: 50px;">Int Keys - Get</h3>
+    <div class="line-chart-container">
+        <canvas id="throughputIntGetChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $threads}}<th class="sortable">{{.}}T</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByThroughput .Throughput.IntGetResults $threads}}
+        <tr>
+            <td>{{$r.Name}}</td>
+            {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
+            <td style="font-weight:bold;">{{qps (avgQPS $r)}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+
+    {{if .Throughput.IntSetResults}}
+    <h3 style="margin-top: 50px;">Int Keys - Set</h3>
+    <div class="line-chart-container">
+        <canvas id="throughputIntSetChart"></canvas>
+    </div>
+
+    <h4>Results Table</h4>
+    <table>
+        <thead>
+        <tr>
+            <th class="sortable">Cache</th>
+            {{range $threads}}<th class="sortable">{{.}}T</th>{{end}}
+            <th class="sortable">Avg</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range $r := sortByThroughput .Throughput.IntSetResults $threads}}
         <tr>
             <td>{{$r.Name}}</td>
             {{range $threads}}<td>{{qps (index $r.QPS .)}}</td>{{end}}
@@ -1241,11 +1295,17 @@ createLineChart('tencentPhotoChart', {{sizeLabels $sizes}}, {{hitRateDatasets .H
 
 {{if .Throughput}}
 {{$threads := .Throughput.Threads}}
-{{if .Throughput.Results}}
-createLineChart('throughputChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.Results $threads}}, 'QPS');
+{{if .Throughput.StringGetResults}}
+createLineChart('throughputStringGetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.StringGetResults $threads}}, 'QPS');
 {{end}}
-{{if .Throughput.IntResults}}
-createLineChart('throughputIntChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntResults $threads}}, 'QPS');
+{{if .Throughput.StringSetResults}}
+createLineChart('throughputStringSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.StringSetResults $threads}}, 'QPS');
+{{end}}
+{{if .Throughput.IntGetResults}}
+createLineChart('throughputIntGetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntGetResults $threads}}, 'QPS');
+{{end}}
+{{if .Throughput.IntSetResults}}
+createLineChart('throughputIntSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntSetResults $threads}}, 'QPS');
 {{end}}
 {{if .Throughput.GetOrSetResults}}
 createLineChart('throughputGetOrSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.GetOrSetResults $threads}}, 'QPS');

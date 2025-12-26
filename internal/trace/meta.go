@@ -10,7 +10,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-//go:embed testdata/meta_trace_10m.csv.zst
+//go:embed testdata/meta_trace_3m.csv.zst
 var metaTraceCompressed []byte
 
 // TraceOp represents a single cache operation from a trace.
@@ -27,7 +27,7 @@ var (
 
 // MetaInfo returns information about the Meta trace.
 func MetaInfo() string {
-	return "Meta KVCache production trace (5M ops)"
+	return "Meta KVCache production trace (3M ops)"
 }
 
 // LoadMetaTrace decompresses and parses the embedded Meta trace data.
@@ -47,7 +47,7 @@ func LoadMetaTrace() ([]TraceOp, error) {
 		}
 
 		scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
-		ops := make([]TraceOp, 0, 10_000_000)
+		ops := make([]TraceOp, 0, 3_000_000)
 
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -64,10 +64,6 @@ func LoadMetaTrace() ([]TraceOp, error) {
 		if err := scanner.Err(); err != nil {
 			errMetaTrace = fmt.Errorf("scan trace: %w", err)
 			return
-		}
-
-		if len(ops) > 5_000_000 {
-			ops = ops[:5_000_000]
 		}
 		metaTraceOps = ops
 	})

@@ -13,21 +13,22 @@ import (
 
 // ThroughputResult holds multi-threaded throughput results for a cache.
 type ThroughputResult struct {
+	QPS  map[int]float64
 	Name string
-	QPS  map[int]float64 // thread count -> QPS
 }
 
 // DefaultThreadCounts are the thread counts to benchmark.
 var DefaultThreadCounts = []int{1, 8, 16, 32}
 
+// Throughput benchmark constants.
 const (
 	ThroughputCacheSize    = 65536 // 64K - realistic cache size for multi-threaded benchmarks
 	throughputWorkloadSize = 1_000_000
 	throughputAlpha        = 0.8
 	benchmarkDuration      = 900 * time.Millisecond
 	opsBatchSize           = 1000
-	throughputValueSize    = 4 * 1024  // 4KB for regular throughput
-	getOrSetValueSize      = 8 * 1024  // 8KB for GetOrSet
+	throughputValueSize    = 4 * 1024 // 4KB for regular throughput
+	getOrSetValueSize      = 8 * 1024 // 8KB for GetOrSet
 )
 
 // RunGetOrSetThroughput benchmarks GetOrSet throughput at various thread counts.
@@ -107,9 +108,7 @@ func measureGetOrSetQPS(factory cache.Factory, keys []string, threads int) float
 	workloadLen := len(keys)
 
 	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := 0; ; {
 				for range opsBatchSize {
 					key := keys[i%workloadLen]
@@ -121,7 +120,7 @@ func measureGetOrSetQPS(factory cache.Factory, keys []string, threads int) float
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	time.Sleep(benchmarkDuration)
@@ -247,9 +246,7 @@ func measureStringGetQPS(factory cache.Factory, keys []int, threads int) float64
 	workloadLen := len(keys)
 
 	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := 0; ; {
 				for range opsBatchSize {
 					idx := keys[i%workloadLen]
@@ -261,7 +258,7 @@ func measureStringGetQPS(factory cache.Factory, keys []int, threads int) float64
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	time.Sleep(benchmarkDuration)
@@ -307,9 +304,7 @@ func measureStringSetQPS(factory cache.Factory, keys []int, threads int) float64
 	workloadLen := len(keys)
 
 	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := 0; ; {
 				for range opsBatchSize {
 					idx := keys[i%workloadLen]
@@ -321,7 +316,7 @@ func measureStringSetQPS(factory cache.Factory, keys []int, threads int) float64
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	time.Sleep(benchmarkDuration)
@@ -356,9 +351,7 @@ func measureIntGetQPS(factory cache.IntFactory, keys []int, threads int) float64
 	workloadLen := len(keys)
 
 	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := 0; ; {
 				for range opsBatchSize {
 					c.Get(keys[i%workloadLen])
@@ -369,7 +362,7 @@ func measureIntGetQPS(factory cache.IntFactory, keys []int, threads int) float64
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	time.Sleep(benchmarkDuration)
@@ -404,9 +397,7 @@ func measureIntSetQPS(factory cache.IntFactory, keys []int, threads int) float64
 	workloadLen := len(keys)
 
 	for range threads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := 0; ; {
 				for range opsBatchSize {
 					key := keys[i%workloadLen]
@@ -418,7 +409,7 @@ func measureIntSetQPS(factory cache.IntFactory, keys []int, threads int) float64
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	time.Sleep(benchmarkDuration)

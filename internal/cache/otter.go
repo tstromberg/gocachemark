@@ -34,6 +34,7 @@ type otterCache struct {
 	c *otter.Cache[string, string]
 }
 
+// NewOtter creates an Otter cache.
 func NewOtter(capacity int) Cache {
 	c := otter.Must(&otter.Options[string, string]{MaximumSize: capacity})
 	return &otterCache{c: c}
@@ -47,14 +48,14 @@ func (c *otterCache) Set(key, value string) {
 	c.c.Set(key, value)
 }
 
-func (c *otterCache) Name() string {
+func (*otterCache) Name() string {
 	return "otter"
 }
 
-func (c *otterCache) Close() {}
+func (*otterCache) Close() {}
 
 func (c *otterCache) GetOrSet(key, value string) string {
-	result, _ := c.c.Get(context.Background(), key, &stringLoader{value: value})
+	result, _ := c.c.Get(context.Background(), key, &stringLoader{value: value}) //nolint:errcheck // loader never fails
 	return result
 }
 
@@ -62,6 +63,7 @@ type otterIntCache struct {
 	c *otter.Cache[int, int]
 }
 
+// NewOtterInt creates an Otter cache with int keys.
 func NewOtterInt(capacity int) IntCache {
 	c := otter.Must(&otter.Options[int, int]{MaximumSize: capacity})
 	return &otterIntCache{c: c}
@@ -75,13 +77,13 @@ func (c *otterIntCache) Set(key, value int) {
 	c.c.Set(key, value)
 }
 
-func (c *otterIntCache) Name() string {
+func (*otterIntCache) Name() string {
 	return "otter"
 }
 
-func (c *otterIntCache) Close() {}
+func (*otterIntCache) Close() {}
 
 func (c *otterIntCache) GetOrSet(key, value int) int {
-	result, _ := c.c.Get(context.Background(), key, &intLoader{value: value})
+	result, _ := c.c.Get(context.Background(), key, &intLoader{value: value}) //nolint:errcheck // loader never fails
 	return result
 }

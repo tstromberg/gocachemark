@@ -6,8 +6,9 @@ type twoQueueCache struct {
 	c *lru.TwoQueueCache[string, string]
 }
 
+// NewTwoQueue creates a 2Q cache.
 func NewTwoQueue(capacity int) Cache {
-	c, _ := lru.New2Q[string, string](capacity)
+	c, _ := lru.New2Q[string, string](capacity) //nolint:errcheck // capacity always valid
 	return &twoQueueCache{c: c}
 }
 
@@ -19,8 +20,8 @@ func (c *twoQueueCache) Set(key, value string) {
 	c.c.Add(key, value)
 }
 
-func (c *twoQueueCache) Name() string {
+func (*twoQueueCache) Name() string {
 	return "2q"
 }
 
-func (c *twoQueueCache) Close() {}
+func (*twoQueueCache) Close() {}

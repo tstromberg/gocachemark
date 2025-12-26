@@ -6,8 +6,9 @@ type lruCache struct {
 	c *lru.Cache[string, string]
 }
 
+// NewLRU creates a hashicorp LRU cache.
 func NewLRU(capacity int) Cache {
-	c, _ := lru.New[string, string](capacity)
+	c, _ := lru.New[string, string](capacity) //nolint:errcheck // capacity always valid
 	return &lruCache{c: c}
 }
 
@@ -19,8 +20,8 @@ func (c *lruCache) Set(key, value string) {
 	c.c.Add(key, value)
 }
 
-func (c *lruCache) Name() string {
+func (*lruCache) Name() string {
 	return "lru"
 }
 
-func (c *lruCache) Close() {}
+func (*lruCache) Close() {}

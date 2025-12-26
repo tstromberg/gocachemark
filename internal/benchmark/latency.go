@@ -8,19 +8,8 @@ import (
 	"github.com/tstromberg/gocachemark/internal/cache"
 )
 
-// LatencyResult holds single-threaded latency results for a cache.
+// LatencyResult holds latency benchmark results for a cache.
 type LatencyResult struct {
-	Name           string
-	GetNsOp        float64 // nanoseconds per Get operation
-	SetNsOp        float64 // nanoseconds per Set operation (no eviction)
-	SetEvictNsOp   float64 // nanoseconds per Set with eviction (20x keyspace)
-	GetAllocs      int64   // allocations per Get
-	SetAllocs      int64   // allocations per Set
-	SetEvictAllocs int64   // allocations per Set with eviction
-}
-
-// IntLatencyResult holds single-threaded latency results for int-keyed caches.
-type IntLatencyResult struct {
 	Name           string
 	GetNsOp        float64
 	SetNsOp        float64
@@ -30,7 +19,7 @@ type IntLatencyResult struct {
 	SetEvictAllocs int64
 }
 
-// GetOrSetLatencyResult holds single-threaded GetOrSet latency results.
+// GetOrSetLatencyResult holds GetOrSet latency results.
 type GetOrSetLatencyResult struct {
 	Name   string
 	NsOp   float64
@@ -76,7 +65,7 @@ func RunLatency() []LatencyResult {
 		keys[i] = strconv.Itoa(i)
 	}
 	evictKeys := make([]string, latencyCacheSize*20)
-	for i := range len(evictKeys) {
+	for i := range evictKeys {
 		evictKeys[i] = strconv.Itoa(i)
 	}
 
@@ -85,13 +74,13 @@ func RunLatency() []LatencyResult {
 		name := c.Name()
 		c.Close()
 
-		getResult := testing.Benchmark(func(b *testing.B) {
+		getResult := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchGet(b, factory, keys)
 		})
-		setResult := testing.Benchmark(func(b *testing.B) {
+		setResult := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchSet(b, factory, keys)
 		})
-		setEvictResult := testing.Benchmark(func(b *testing.B) {
+		setEvictResult := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchSetEvict(b, factory, evictKeys)
 		})
 
@@ -126,7 +115,7 @@ func RunGetOrSetLatency() []GetOrSetLatencyResult {
 			continue
 		}
 
-		result := testing.Benchmark(func(b *testing.B) {
+		result := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchGetOrSet(b, factory, keys)
 		})
 
@@ -140,16 +129,16 @@ func RunGetOrSetLatency() []GetOrSetLatencyResult {
 	return results
 }
 
-// RunIntLatency benchmarks single-threaded Get/Set latency for int-keyed caches.
-func RunIntLatency() []IntLatencyResult {
-	results := make([]IntLatencyResult, 0, len(cache.AllInt()))
+// RunIntLatency benchmarks latency for int-keyed caches.
+func RunIntLatency() []LatencyResult {
+	results := make([]LatencyResult, 0, len(cache.AllInt()))
 
 	keys := make([]int, latencyCacheSize)
 	for i := range latencyCacheSize {
 		keys[i] = i
 	}
 	evictKeys := make([]int, latencyCacheSize*20)
-	for i := range len(evictKeys) {
+	for i := range evictKeys {
 		evictKeys[i] = i
 	}
 
@@ -158,17 +147,17 @@ func RunIntLatency() []IntLatencyResult {
 		name := c.Name()
 		c.Close()
 
-		getResult := testing.Benchmark(func(b *testing.B) {
+		getResult := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchIntGet(b, factory, keys)
 		})
-		setResult := testing.Benchmark(func(b *testing.B) {
+		setResult := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchIntSet(b, factory, keys)
 		})
-		setEvictResult := testing.Benchmark(func(b *testing.B) {
+		setEvictResult := testing.Benchmark(func(b *testing.B) { //nolint:thelper // inline benchmark wrapper
 			benchIntSetEvict(b, factory, evictKeys)
 		})
 
-		results = append(results, IntLatencyResult{
+		results = append(results, LatencyResult{
 			Name:           name,
 			GetNsOp:        float64(getResult.NsPerOp()),
 			SetNsOp:        float64(setResult.NsPerOp()),
@@ -182,6 +171,7 @@ func RunIntLatency() []IntLatencyResult {
 	return results
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchGet(b *testing.B, factory cache.Factory, keys []string) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
@@ -197,6 +187,7 @@ func benchGet(b *testing.B, factory cache.Factory, keys []string) {
 	}
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchSet(b *testing.B, factory cache.Factory, keys []string) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
@@ -214,12 +205,13 @@ func benchSet(b *testing.B, factory cache.Factory, keys []string) {
 	}
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchSetEvict(b *testing.B, factory cache.Factory, keys []string) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
 
 	// Pre-fill cache to capacity, then measure eviction with new keys.
-	for i := 0; i < latencyCacheSize; i++ {
+	for i := range latencyCacheSize {
 		c.Set(keys[i], keys[i])
 	}
 
@@ -233,6 +225,7 @@ func benchSetEvict(b *testing.B, factory cache.Factory, keys []string) {
 	}
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchIntGet(b *testing.B, factory cache.IntFactory, keys []int) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
@@ -248,6 +241,7 @@ func benchIntGet(b *testing.B, factory cache.IntFactory, keys []int) {
 	}
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchIntSet(b *testing.B, factory cache.IntFactory, keys []int) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
@@ -265,12 +259,13 @@ func benchIntSet(b *testing.B, factory cache.IntFactory, keys []int) {
 	}
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchIntSetEvict(b *testing.B, factory cache.IntFactory, keys []int) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
 
 	// Pre-fill cache to capacity.
-	for i := 0; i < latencyCacheSize; i++ {
+	for i := range latencyCacheSize {
 		c.Set(keys[i], keys[i])
 	}
 
@@ -284,6 +279,7 @@ func benchIntSetEvict(b *testing.B, factory cache.IntFactory, keys []int) {
 	}
 }
 
+//nolint:thelper // benchmark function, not test helper
 func benchGetOrSet(b *testing.B, factory cache.Factory, keys []string) {
 	c := factory(latencyCacheSize)
 	defer c.Close()
@@ -294,7 +290,7 @@ func benchGetOrSet(b *testing.B, factory cache.Factory, keys []string) {
 	}
 
 	// Pre-populate half the keys to test both hit and miss cases
-	for i := 0; i < latencyCacheSize/2; i++ {
+	for i := range latencyCacheSize / 2 {
 		gosCache.Set(keys[i], keys[i])
 	}
 
@@ -305,4 +301,3 @@ func benchGetOrSet(b *testing.B, factory cache.Factory, keys []string) {
 		gosCache.GetOrSet(k, k)
 	}
 }
-

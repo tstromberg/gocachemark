@@ -11,6 +11,35 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
+// loadSimpleTrace decompresses zstd data and parses lines as string keys.
+func loadSimpleTrace(compressed []byte, capacity int) ([]string, error) {
+	decoder, err := zstd.NewReader(nil)
+	if err != nil {
+		return nil, fmt.Errorf("create zstd decoder: %w", err)
+	}
+	defer decoder.Close()
+
+	decompressed, err := decoder.DecodeAll(compressed, nil)
+	if err != nil {
+		return nil, fmt.Errorf("decompress trace: %w", err)
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
+	ops := make([]string, 0, capacity)
+
+	for scanner.Scan() {
+		if key := scanner.Text(); key != "" {
+			ops = append(ops, key)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan trace: %w", err)
+	}
+
+	return ops, nil
+}
+
 //go:embed testdata/reag0c01_keys_only.csv.zst
 var cdnTraceCompressed []byte
 
@@ -28,36 +57,7 @@ func CDNInfo() string {
 // LoadCDNTrace decompresses and parses the embedded CDN trace data.
 func LoadCDNTrace() ([]string, error) {
 	cdnTraceOnce.Do(func() {
-		decoder, err := zstd.NewReader(nil)
-		if err != nil {
-			errCDNTrace = fmt.Errorf("create zstd decoder: %w", err)
-			return
-		}
-		defer decoder.Close()
-
-		decompressed, err := decoder.DecodeAll(cdnTraceCompressed, nil)
-		if err != nil {
-			errCDNTrace = fmt.Errorf("decompress trace: %w", err)
-			return
-		}
-
-		scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
-		ops := make([]string, 0, 2_000_000)
-
-		for scanner.Scan() {
-			key := scanner.Text()
-			if key != "" {
-				ops = append(ops, key)
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			errCDNTrace = fmt.Errorf("scan trace: %w", err)
-			return
-		}
-
-		cdnTraceOps = ops
+		cdnTraceOps, errCDNTrace = loadSimpleTrace(cdnTraceCompressed, 2_000_000)
 	})
-
 	return cdnTraceOps, errCDNTrace
 }

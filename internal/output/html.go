@@ -16,38 +16,38 @@ import (
 //go:embed template.html
 var templateFS embed.FS
 
-// Results holds all benchmark results for HTML output.
+// Results holds all benchmark results for output.
 type Results struct {
-	Timestamp   string
 	HitRate     *HitRateData
 	Latency     *LatencyData
 	Throughput  *ThroughputData
 	Memory      *MemoryData
-	Rankings    []Ranking
 	MedalTable  *MedalTable
 	MachineInfo MachineInfo
+	Timestamp   string
+	Rankings    []Ranking
 }
 
-// MachineInfo holds information about the benchmark environment.
+// MachineInfo describes the benchmark environment.
 type MachineInfo struct {
-	OS          string
-	Arch        string
-	NumCPU      int
-	GoVersion   string
-	CommandLine string
+	OS          string `json:"os"`
+	Arch        string `json:"arch"`
+	GoVersion   string `json:"goVersion"`
+	CommandLine string `json:"commandLine"`
+	NumCPU      int    `json:"numCpu"`
 }
 
-// Ranking represents an overall ranking entry.
+// Ranking holds a cache's overall ranking.
 type Ranking struct {
-	Rank   int
-	Name   string
-	Score  float64
-	Gold   int
-	Silver int
-	Bronze int
+	Name   string  `json:"name"`
+	Rank   int     `json:"rank"`
+	Score  float64 `json:"score"`
+	Gold   int     `json:"gold"`
+	Silver int     `json:"silver"`
+	Bronze int     `json:"bronze"`
 }
 
-// BenchmarkMedal represents a single benchmark's top 3 placements.
+// BenchmarkMedal shows medal winners for a single benchmark.
 type BenchmarkMedal struct {
 	Name   string
 	Gold   string
@@ -55,26 +55,26 @@ type BenchmarkMedal struct {
 	Bronze string
 }
 
-// CategoryMedals holds medals for a benchmark category with its winner.
+// CategoryMedals groups medal results by category.
 type CategoryMedals struct {
 	Name       string
 	Benchmarks []BenchmarkMedal
 	Rankings   []Ranking
 }
 
-// MedalTable holds all benchmark medals organized by category.
+// MedalTable holds all category medal results.
 type MedalTable struct {
 	Categories []CategoryMedals
 }
 
-// MemoryData holds memory benchmark data.
+// MemoryData holds memory benchmark results.
 type MemoryData struct {
-	Results  []benchmark.MemoryResult
-	Capacity int
-	ValSize  int
+	Results  []benchmark.MemoryResult `json:"results"`
+	Capacity int                      `json:"capacity"`
+	ValSize  int                      `json:"valSize"`
 }
 
-// HitRateData holds hit rate benchmark data.
+// HitRateData holds hit rate benchmark results.
 type HitRateData struct {
 	CDN          []benchmark.HitRateResult
 	Meta         []benchmark.HitRateResult
@@ -88,14 +88,14 @@ type HitRateData struct {
 	Sizes        []int
 }
 
-// LatencyData holds latency benchmark data.
+// LatencyData holds latency benchmark results.
 type LatencyData struct {
 	Results         []benchmark.LatencyResult
-	IntResults      []benchmark.IntLatencyResult
+	IntResults      []benchmark.LatencyResult
 	GetOrSetResults []benchmark.GetOrSetLatencyResult
 }
 
-// ThroughputData holds throughput benchmark data.
+// ThroughputData holds throughput benchmark results.
 type ThroughputData struct {
 	StringGetResults []benchmark.ThroughputResult
 	StringSetResults []benchmark.ThroughputResult
@@ -114,7 +114,7 @@ func WriteHTML(filename string, results Results, commandLine string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // best-effort close
 
 	return htmlTemplate.Execute(f, results)
 }
@@ -140,9 +140,6 @@ var templateFuncs = template.FuncMap{
 		return sum / float64(len(sizes))
 	},
 	"avgLatency": func(r benchmark.LatencyResult) float64 {
-		return (r.GetNsOp + r.SetNsOp) / 2
-	},
-	"avgIntLatency": func(r benchmark.IntLatencyResult) float64 {
 		return (r.GetNsOp + r.SetNsOp) / 2
 	},
 	"avgQPS": func(r benchmark.ThroughputResult) float64 {
@@ -173,14 +170,6 @@ var templateFuncs = template.FuncMap{
 		})
 		return sorted
 	},
-	"sortByIntGetLatency": func(results []benchmark.IntLatencyResult) []benchmark.IntLatencyResult {
-		sorted := make([]benchmark.IntLatencyResult, len(results))
-		copy(sorted, results)
-		sort.Slice(sorted, func(i, j int) bool {
-			return sorted[i].GetNsOp < sorted[j].GetNsOp
-		})
-		return sorted
-	},
 	"sortByThroughput": func(results []benchmark.ThroughputResult, threads []int) []benchmark.ThroughputResult {
 		sorted := make([]benchmark.ThroughputResult, len(results))
 		copy(sorted, results)
@@ -196,7 +185,7 @@ var templateFuncs = template.FuncMap{
 		for i, s := range sizes {
 			labels[i] = fmt.Sprintf("\"%dK\"", s/1024)
 		}
-		return template.JS("[" + strings.Join(labels, ",") + "]")
+		return template.JS("[" + strings.Join(labels, ",") + "]") //nolint:gosec // trusted data
 	},
 	"hitRateDatasets": func(results []benchmark.HitRateResult, sizes []int) template.JS {
 		fallback := []string{"#388E3C", "#1E88E5", "#E53935", "#8E24AA", "#FB8C00"}
@@ -211,18 +200,19 @@ var templateFuncs = template.FuncMap{
 				data = append(data, fmt.Sprintf("%.2f", r.Rates[size]))
 			}
 			datasets = append(datasets, fmt.Sprintf(
-				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,borderWidth:1.5,pointRadius:2,pointHoverRadius:4}`,
+				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",`+
+					`tension:0.1,fill:false,borderWidth:1.5,pointRadius:2,pointHoverRadius:4}`,
 				r.Name, strings.Join(data, ","), color, color,
 			))
 		}
-		return template.JS("[" + strings.Join(datasets, ",") + "]")
+		return template.JS("[" + strings.Join(datasets, ",") + "]") //nolint:gosec // trusted data
 	},
 	"threadLabels": func(threads []int) template.JS {
 		labels := make([]string, len(threads))
 		for i, t := range threads {
 			labels[i] = fmt.Sprintf("\"%dT\"", t)
 		}
-		return template.JS("[" + strings.Join(labels, ",") + "]")
+		return template.JS("[" + strings.Join(labels, ",") + "]") //nolint:gosec // trusted data
 	},
 	"throughputDatasets": func(results []benchmark.ThroughputResult, threads []int) template.JS {
 		fallback := []string{"#388E3C", "#1E88E5", "#E53935", "#8E24AA", "#FB8C00"}
@@ -237,23 +227,24 @@ var templateFuncs = template.FuncMap{
 				data = append(data, fmt.Sprintf("%.0f", r.QPS[t]))
 			}
 			datasets = append(datasets, fmt.Sprintf(
-				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",tension:0.1,fill:false,borderWidth:1.5,pointRadius:2,pointHoverRadius:4}`,
+				`{label:"%s",data:[%s],borderColor:"%s",backgroundColor:"%s",`+
+					`tension:0.1,fill:false,borderWidth:1.5,pointRadius:2,pointHoverRadius:4}`,
 				r.Name, strings.Join(data, ","), color, color,
 			))
 		}
-		return template.JS("[" + strings.Join(datasets, ",") + "]")
+		return template.JS("[" + strings.Join(datasets, ",") + "]") //nolint:gosec // trusted data
 	},
 	"allocColor": func(n int64) template.CSS {
-		switch {
-		case n == 0:
+		switch n {
+		case 0:
 			return "background:#fff;color:#333"
-		case n == 1:
+		case 1:
 			return "background:#fff3cd;color:#333"
-		case n == 2:
+		case 2:
 			return "background:#ffcc80;color:#333"
-		case n == 3:
+		case 3:
 			return "background:#ef5350;color:#fff"
-		case n == 4:
+		case 4:
 			return "background:#c62828;color:#fff"
 		default:
 			return "background:#8b0000;color:#fff"
@@ -267,74 +258,47 @@ var templateFuncs = template.FuncMap{
 		}
 		return fmt.Sprintf("%.0fK", f/1_000)
 	},
-	"barWidth": func(value, max float64) float64 {
-		if max == 0 {
+	"barWidth": func(value, maxVal float64) float64 {
+		if maxVal == 0 {
 			return 0
 		}
-		return (value / max) * 100
+		return (value / maxVal) * 100
 	},
 	"maxLatency": func(results []benchmark.LatencyResult) float64 {
-		max := 0.0
+		m := 0.0
 		for _, r := range results {
-			if r.GetNsOp > max {
-				max = r.GetNsOp
+			if r.GetNsOp > m {
+				m = r.GetNsOp
 			}
 		}
-		return max
+		return m
 	},
 	"maxSetLatency": func(results []benchmark.LatencyResult) float64 {
-		max := 0.0
+		m := 0.0
 		for _, r := range results {
-			if r.SetNsOp > max {
-				max = r.SetNsOp
+			if r.SetNsOp > m {
+				m = r.SetNsOp
 			}
 		}
-		return max
+		return m
 	},
 	"maxSetEvictLatency": func(results []benchmark.LatencyResult) float64 {
-		max := 0.0
+		m := 0.0
 		for _, r := range results {
-			if r.SetEvictNsOp > max {
-				max = r.SetEvictNsOp
+			if r.SetEvictNsOp > m {
+				m = r.SetEvictNsOp
 			}
 		}
-		return max
-	},
-	"maxIntLatency": func(results []benchmark.IntLatencyResult) float64 {
-		max := 0.0
-		for _, r := range results {
-			if r.GetNsOp > max {
-				max = r.GetNsOp
-			}
-		}
-		return max
-	},
-	"maxIntSetLatency": func(results []benchmark.IntLatencyResult) float64 {
-		max := 0.0
-		for _, r := range results {
-			if r.SetNsOp > max {
-				max = r.SetNsOp
-			}
-		}
-		return max
-	},
-	"maxIntSetEvictLatency": func(results []benchmark.IntLatencyResult) float64 {
-		max := 0.0
-		for _, r := range results {
-			if r.SetEvictNsOp > max {
-				max = r.SetEvictNsOp
-			}
-		}
-		return max
+		return m
 	},
 	"maxGetOrSetLatency": func(results []benchmark.GetOrSetLatencyResult) float64 {
-		max := 0.0
+		m := 0.0
 		for _, r := range results {
-			if r.NsOp > max {
-				max = r.NsOp
+			if r.NsOp > m {
+				m = r.NsOp
 			}
 		}
-		return max
+		return m
 	},
 	"sortGetOrSet": func(results []benchmark.GetOrSetLatencyResult) []benchmark.GetOrSetLatencyResult {
 		sorted := make([]benchmark.GetOrSetLatencyResult, len(results))
@@ -345,22 +309,22 @@ var templateFuncs = template.FuncMap{
 		return sorted
 	},
 	"maxQPS": func(results []benchmark.ThroughputResult, threads int) float64 {
-		max := 0.0
+		m := 0.0
 		for _, r := range results {
-			if r.QPS[threads] > max {
-				max = r.QPS[threads]
+			if r.QPS[threads] > m {
+				m = r.QPS[threads]
 			}
 		}
-		return max
+		return m
 	},
 	"maxOverhead": func(results []benchmark.MemoryResult) float64 {
-		max := int64(0)
+		m := int64(0)
 		for _, r := range results {
-			if r.BytesPerItem > max {
-				max = r.BytesPerItem
+			if r.BytesPerItem > m {
+				m = r.BytesPerItem
 			}
 		}
-		return float64(max)
+		return float64(m)
 	},
 	"mb": func(b uint64) string {
 		return fmt.Sprintf("%.2f", float64(b)/1024/1024)

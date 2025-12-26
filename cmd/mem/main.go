@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/Code-Hex/go-generics-cache/policy/clock"
@@ -27,8 +26,6 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
-var keepAlive any
-
 func main() {
 	cacheName := flag.String("cache", "", "cache implementation to benchmark")
 	capacity := flag.Int("cap", 32768, "capacity")
@@ -40,14 +37,14 @@ func main() {
 		return
 	}
 
-	runtime.GC()
+	runtime.GC() //nolint:revive // intentional GC for memory measurement
 	debug.FreeOSMemory()
 
 	items := runBenchmark(*cacheName, *capacity, *valSize)
 
-	runtime.GC()
+	runtime.GC() //nolint:revive // intentional GC for memory measurement
 	time.Sleep(100 * time.Millisecond)
-	runtime.GC()
+	runtime.GC() //nolint:revive // intentional GC for memory measurement
 	debug.FreeOSMemory()
 
 	var mem runtime.MemStats
@@ -101,7 +98,7 @@ func runBaseline(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		m[key] = make([]byte, valSize)
 	}
-	keepAlive = m
+	runtime.KeepAlive(m)
 	return len(m)
 }
 
@@ -111,7 +108,7 @@ func runMulticache(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
@@ -121,22 +118,22 @@ func runOtter(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.EstimatedSize()
 }
 
 func runTheine(capacity, valSize int) int {
-	c, _ := theine.NewBuilder[string, []byte](int64(capacity)).Build()
+	c, _ := theine.NewBuilder[string, []byte](int64(capacity)).Build() //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize), 0)
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
 func runRistretto(capacity, valSize int) int {
-	c, _ := ristretto.NewCache(&ristretto.Config{
+	c, _ := ristretto.NewCache(&ristretto.Config{ //nolint:errcheck // capacity always valid
 		NumCounters:        int64(capacity * 10),
 		MaxCost:            int64(capacity),
 		BufferItems:        64,
@@ -155,7 +152,7 @@ func runRistretto(capacity, valSize int) int {
 		c.Wait()
 	}
 
-	keepAlive = c
+	runtime.KeepAlive(c)
 
 	count := 0
 	for i := range capacity {
@@ -168,8 +165,7 @@ func runRistretto(capacity, valSize int) int {
 }
 
 type tinyLFUWrapper struct {
-	c  *tinylfu.T
-	mu sync.Mutex
+	c *tinylfu.T
 }
 
 func runTinyLFU(capacity, valSize int) int {
@@ -180,7 +176,7 @@ func runTinyLFU(capacity, valSize int) int {
 		c.Set(&tinylfu.Item{Key: key, Value: make([]byte, valSize)})
 	}
 	w := &tinyLFUWrapper{c: c}
-	keepAlive = w
+	runtime.KeepAlive(w)
 
 	count := 0
 	for i := range capacity {
@@ -198,7 +194,7 @@ func runSieve(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
@@ -208,31 +204,31 @@ func runS3FIFO(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
 func hashString(s string) uint32 {
-	return uint32(xxh3.HashString(s))
+	return uint32(xxh3.HashString(s)) //nolint:gosec // safe truncation
 }
 
 func runFreeLRUSharded(capacity, valSize int) int {
-	c, _ := freelru.NewSharded[string, []byte](uint32(capacity), hashString)
+	c, _ := freelru.NewSharded[string, []byte](uint32(capacity), hashString) //nolint:errcheck,gosec // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
 func runFreeLRUSynced(capacity, valSize int) int {
-	c, _ := freelru.NewSynced[string, []byte](uint32(capacity), hashString)
+	c, _ := freelru.NewSynced[string, []byte](uint32(capacity), hashString) //nolint:errcheck,gosec // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
@@ -242,19 +238,19 @@ func runFreecache(capacity, valSize int) int {
 	c := freecache.NewCache(size)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
-		c.Set([]byte(key), make([]byte, valSize), 0)
+		c.Set([]byte(key), make([]byte, valSize), 0) //nolint:errcheck,gosec // best-effort set
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return int(c.EntryCount())
 }
 
 func runTwoQueue(capacity, valSize int) int {
-	c, _ := lru2.New2Q[string, []byte](capacity)
+	c, _ := lru2.New2Q[string, []byte](capacity) //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
@@ -265,7 +261,7 @@ func runS4LRU(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
@@ -275,17 +271,17 @@ func runClock(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
 func runLRU(capacity, valSize int) int {
-	c, _ := lru2.New[string, []byte](capacity)
+	c, _ := lru2.New[string, []byte](capacity) //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		c.Add(key, make([]byte, valSize))
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }
 
@@ -301,6 +297,6 @@ func runTTLCache(capacity, valSize int) int {
 		key := "key-" + strconv.Itoa(i)
 		c.Set(key, make([]byte, valSize), ttlcache.DefaultTTL)
 	}
-	keepAlive = c
+	runtime.KeepAlive(c)
 	return c.Len()
 }

@@ -44,6 +44,7 @@ var validTests = []string{
 // suiteFilter holds which suites to run.
 var suiteFilter map[string]bool
 
+//nolint:gocognit // main entry point handles CLI parsing and orchestration
 func main() {
 	showHelp := flag.Bool("help", false, "Show help message")
 	suites := flag.String("suites", "all", "Comma-separated list of benchmark suites: hitrate,latency,throughput,memory (default: all)")
@@ -68,7 +69,7 @@ func main() {
 			suiteFilter[s] = true
 		}
 	} else {
-		for _, s := range strings.Split(*suites, ",") {
+		for s := range strings.SplitSeq(*suites, ",") {
 			s = strings.TrimSpace(strings.ToLower(s))
 			if s != "" {
 				suiteFilter[s] = true
@@ -92,7 +93,7 @@ func main() {
 		for _, t := range validTests {
 			validTestSet[t] = true
 		}
-		for _, t := range strings.Split(*tests, ",") {
+		for t := range strings.SplitSeq(*tests, ",") {
 			t = strings.TrimSpace(strings.ToLower(t))
 			if t == "" {
 				continue
@@ -112,7 +113,7 @@ func main() {
 	cacheSizes = benchmark.DefaultCacheSizes
 	if *sizes != "" {
 		cacheSizes = nil
-		for _, s := range strings.Split(*sizes, ",") {
+		for s := range strings.SplitSeq(*sizes, ",") {
 			s = strings.TrimSpace(s)
 			var size int
 			if _, err := fmt.Sscanf(s, "%d", &size); err == nil {
@@ -125,7 +126,7 @@ func main() {
 	threadCounts = benchmark.DefaultThreadCounts
 	if *threads != "" {
 		threadCounts = nil
-		for _, t := range strings.Split(*threads, ",") {
+		for t := range strings.SplitSeq(*threads, ",") {
 			t = strings.TrimSpace(t)
 			var count int
 			if _, err := fmt.Sscanf(t, "%d", &count); err == nil {
@@ -169,8 +170,8 @@ func main() {
 
 	// Determine output paths
 	var htmlPath, mdPath, jsonPath string
-	if *outDir != "" {
-		if err := os.MkdirAll(*outDir, 0755); err != nil {
+	if *outDir != "" { //nolint:gocritic // ifElseChain: clearer than switch for exclusive conditions
+		if err := os.MkdirAll(*outDir, 0o755); err != nil { //nolint:gosec // G301: 0755 is standard dir permission
 			fmt.Fprintf(os.Stderr, "Error creating output directory: %v\n", err)
 			os.Exit(1)
 		}
@@ -297,10 +298,7 @@ func printHeader() {
 
 func printSuite(name, description string) {
 	header := fmt.Sprintf("%s: %s ", name, description)
-	padding := lineWidth - len(header)
-	if padding < 4 {
-		padding = 4
-	}
+	padding := max(lineWidth-len(header), 4)
 	fmt.Printf("%s%s\n\n", header, strings.Repeat("─", padding))
 }
 
@@ -419,19 +417,11 @@ func runHitRateBenchmarks() *output.HitRateData {
 	return data
 }
 
-func avgHitRate(r benchmark.HitRateResult, sizes []int) float64 {
-	var sum float64
-	for _, size := range sizes {
-		sum += r.Rates[size]
-	}
-	return sum / float64(len(sizes))
-}
-
 func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
 	sorted := make([]benchmark.HitRateResult, len(results))
 	copy(sorted, results)
 	sort.Slice(sorted, func(i, j int) bool {
-		return avgHitRate(sorted[i], sizes) > avgHitRate(sorted[j], sizes)
+		return output.AvgHitRate(sorted[i], sizes) > output.AvgHitRate(sorted[j], sizes)
 	})
 
 	fmt.Print("  | Cache         |")
@@ -451,14 +441,14 @@ func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
 		for _, size := range sizes {
 			fmt.Printf(" %5.2f%% |", r.Rates[size])
 		}
-		fmt.Printf(" %5.2f%% |\n", avgHitRate(r, sizes))
+		fmt.Printf(" %5.2f%% |\n", output.AvgHitRate(r, sizes))
 	}
 
 	if len(sorted) >= 2 {
 		best := sorted[0]
 		second := sorted[1]
-		bestAvg := avgHitRate(best, sizes)
-		secondAvg := avgHitRate(second, sizes)
+		bestAvg := output.AvgHitRate(best, sizes)
+		secondAvg := output.AvgHitRate(second, sizes)
 		pct := (bestAvg - secondAvg) / secondAvg * 100
 		fmt.Printf("\n  winner: %s (%.2f%% avg, +%.2f%% vs %s)\n", best.Name, bestAvg, pct, second.Name)
 	}
@@ -539,11 +529,11 @@ func runLatencyBenchmarks() *output.LatencyData {
 		results := benchmark.RunIntLatency()
 		data.IntResults = results
 
-		avgLatency := func(r benchmark.IntLatencyResult) float64 {
+		avgLatency := func(r benchmark.LatencyResult) float64 {
 			return (r.GetNsOp + r.SetNsOp) / 2
 		}
 
-		sorted := make([]benchmark.IntLatencyResult, len(results))
+		sorted := make([]benchmark.LatencyResult, len(results))
 		copy(sorted, results)
 		sort.Slice(sorted, func(i, j int) bool {
 			return avgLatency(sorted[i]) < avgLatency(sorted[j])
@@ -729,11 +719,11 @@ func openBrowser(path string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", path)
+		cmd = exec.Command("open", path) //nolint:noctx // trusted command, fire-and-forget
 	case "linux":
-		cmd = exec.Command("xdg-open", path)
+		cmd = exec.Command("xdg-open", path) //nolint:noctx // trusted command, fire-and-forget
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", path)
+		cmd = exec.Command("cmd", "/c", "start", path) //nolint:noctx // trusted command, fire-and-forget
 	default:
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}

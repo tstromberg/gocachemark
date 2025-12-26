@@ -14,16 +14,17 @@ func WriteMarkdown(filename string, results Results, commandLine string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // best-effort close
 
 	w := func(format string, args ...any) {
-		fmt.Fprintf(f, format, args...)
+		fmt.Fprintf(f, format, args...) //nolint:errcheck // best-effort write
 	}
 
 	w("# gocachemark Results\n\n")
 	w("```\n")
 	w("Command: %s\n", commandLine)
-	w("Environment: %s/%s, %d CPUs, %s\n", results.MachineInfo.OS, results.MachineInfo.Arch, results.MachineInfo.NumCPU, results.MachineInfo.GoVersion)
+	mi := results.MachineInfo
+	w("Environment: %s/%s, %d CPUs, %s\n", mi.OS, mi.Arch, mi.NumCPU, mi.GoVersion)
 	w("```\n\n")
 
 	// Hit Rate
@@ -43,8 +44,8 @@ func WriteMarkdown(filename string, results Results, commandLine string) error {
 	// Latency
 	if results.Latency != nil {
 		w("## Latency Benchmarks\n\n")
-		writeLatencyMarkdown(w, results.Latency.Results)
-		writeIntLatencyMarkdown(w, results.Latency.IntResults)
+		writeLatencyMarkdown(w, "String Keys", results.Latency.Results)
+		writeLatencyMarkdown(w, "Int Keys", results.Latency.IntResults)
 		writeGetOrSetLatencyMarkdown(w, results.Latency.GetOrSetResults)
 	}
 
@@ -103,7 +104,7 @@ func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.
 	sorted := make([]benchmark.HitRateResult, len(data))
 	copy(sorted, data)
 	sort.Slice(sorted, func(i, j int) bool {
-		return avgHitRate(sorted[i], sizes) > avgHitRate(sorted[j], sizes)
+		return AvgHitRate(sorted[i], sizes) > AvgHitRate(sorted[j], sizes)
 	})
 
 	// Data rows
@@ -112,26 +113,26 @@ func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.
 		for _, size := range sizes {
 			w(" %5.2f%% |", r.Rates[size])
 		}
-		w(" %5.2f%% |\n", avgHitRate(r, sizes))
+		w(" %5.2f%% |\n", AvgHitRate(r, sizes))
 	}
 
 	// Winner line
 	if len(sorted) >= 2 {
 		best, second := sorted[0], sorted[1]
-		bestAvg := avgHitRate(best, sizes)
-		secondAvg := avgHitRate(second, sizes)
+		bestAvg := AvgHitRate(best, sizes)
+		secondAvg := AvgHitRate(second, sizes)
 		pct := ((bestAvg - secondAvg) / secondAvg) * 100
 		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
 	}
 	w("\n")
 }
 
-func writeLatencyMarkdown(w func(string, ...any), data []benchmark.LatencyResult) {
+func writeLatencyMarkdown(w func(string, ...any), title string, data []benchmark.LatencyResult) {
 	if len(data) == 0 {
 		return
 	}
 
-	w("### String Keys\n\n")
+	w("### %s\n\n", title)
 	w("| Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |\n")
 	w("|---------------|--------|-----------|--------|-----------|-------------|----------------|--------|\n")
 
@@ -147,39 +148,6 @@ func writeLatencyMarkdown(w func(string, ...any), data []benchmark.LatencyResult
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avg)
 	}
 
-	// Winner line
-	if len(sorted) >= 2 {
-		best, second := sorted[0], sorted[1]
-		bestAvg := (best.GetNsOp + best.SetNsOp) / 2
-		secondAvg := (second.GetNsOp + second.SetNsOp) / 2
-		pct := ((secondAvg - bestAvg) / bestAvg) * 100
-		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
-	}
-	w("\n")
-}
-
-func writeIntLatencyMarkdown(w func(string, ...any), data []benchmark.IntLatencyResult) {
-	if len(data) == 0 {
-		return
-	}
-
-	w("### Int Keys\n\n")
-	w("| Cache         | Get ns | Get alloc | Set ns | Set alloc | Avg ns |\n")
-	w("|---------------|--------|-----------|--------|-----------|--------|\n")
-
-	sorted := make([]benchmark.IntLatencyResult, len(data))
-	copy(sorted, data)
-	sort.Slice(sorted, func(i, j int) bool {
-		return (sorted[i].GetNsOp + sorted[i].SetNsOp) < (sorted[j].GetNsOp + sorted[j].SetNsOp)
-	})
-
-	for _, r := range sorted {
-		avg := (r.GetNsOp + r.SetNsOp) / 2
-		w("| %-13s | %6.0f | %9d | %6.0f | %9d | %6.0f |\n",
-			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, avg)
-	}
-
-	// Winner line
 	if len(sorted) >= 2 {
 		best, second := sorted[0], sorted[1]
 		bestAvg := (best.GetNsOp + best.SetNsOp) / 2
@@ -296,12 +264,4 @@ func writeMemoryMarkdown(w func(string, ...any), data []benchmark.MemoryResult) 
 		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
 	}
 	w("\n")
-}
-
-func avgQPS(r benchmark.ThroughputResult) float64 {
-	var sum float64
-	for _, qps := range r.QPS {
-		sum += qps
-	}
-	return sum / float64(len(r.QPS))
 }

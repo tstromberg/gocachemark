@@ -12,8 +12,8 @@ import (
 
 // HitRateResult holds hit rate results for a single cache.
 type HitRateResult struct {
+	Rates map[int]float64
 	Name  string
-	Rates map[int]float64 // cache size -> hit rate percentage
 }
 
 // DefaultCacheSizes are the cache sizes to benchmark.
@@ -22,35 +22,26 @@ var DefaultCacheSizes = []int{16_384, 32_768, 65_536, 131_072, 262_144}
 // Entry size constants for different workloads (key + value + overhead).
 // These ensure byte-based caches like freecache are sized fairly.
 const (
-	// CDN trace: avg key ~77 bytes, value=key, ~32 bytes overhead
-	CDNEntrySize = 190
-	// Meta trace: avg key ~10 bytes, value=key, ~32 bytes overhead
-	MetaEntrySize = 55
-	// Zipf trace: key ~6 bytes (int as string), value=key, ~32 bytes overhead
-	ZipfEntrySize = 45
-	// Twitter trace: avg key ~40 bytes, value=key, ~32 bytes overhead
-	TwitterEntrySize = 110
-	// Wikipedia trace: avg key ~10 bytes, value=key, ~32 bytes overhead
-	WikipediaEntrySize = 55
-	// Thesios block trace: key is ~72 bytes (hash:offset), value=key, ~32 bytes overhead
-	ThesiosBlockEntrySize = 180
-	// Thesios file trace: key is 64 bytes (hash only), value=key, ~32 bytes overhead
-	ThesiosFileEntrySize = 160
-	// IBM Docker trace: key is ~40 bytes (URI), value=key, ~32 bytes overhead
-	IBMDockerEntrySize = 115
-	// Tencent Photo trace: key is 40 bytes (hex hash), value=key, ~32 bytes overhead
-	TencentPhotoEntrySize = 115
+	CDNEntrySize          = 190 // avg key ~77 bytes, value=key, ~32 bytes overhead
+	MetaEntrySize         = 55  // avg key ~10 bytes, value=key, ~32 bytes overhead
+	ZipfEntrySize         = 45  // key ~6 bytes (int as string), value=key, ~32 bytes overhead
+	TwitterEntrySize      = 110 // avg key ~40 bytes, value=key, ~32 bytes overhead
+	WikipediaEntrySize    = 55  // avg key ~10 bytes, value=key, ~32 bytes overhead
+	ThesiosBlockEntrySize = 180 // key ~72 bytes (hash:offset), value=key, ~32 bytes overhead
+	ThesiosFileEntrySize  = 160 // key 64 bytes (hash only), value=key, ~32 bytes overhead
+	IBMDockerEntrySize    = 115 // key ~40 bytes (URI), value=key, ~32 bytes overhead
+	TencentPhotoEntrySize = 115 // key 40 bytes (hex hash), value=key, ~32 bytes overhead
 )
 
-// RunCDNHitRate benchmarks hit rates using the CDN production trace.
-func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadCDNTrace()
+// runStringHitRate is the common implementation for string-based trace benchmarks.
+func runStringHitRate(loader func() ([]string, error), entrySize int, sizes []int, traceName string) ([]HitRateResult, error) {
+	ops, err := loader()
 	if err != nil {
-		return nil, fmt.Errorf("load CDN trace: %w", err)
+		return nil, fmt.Errorf("load %s trace: %w", traceName, err)
 	}
 
 	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(CDNEntrySize) {
+	for _, factory := range cache.AllWithEntrySize(entrySize) {
 		c := factory(sizes[0])
 		name := c.Name()
 		c.Close()
@@ -63,6 +54,11 @@ func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
 	}
 
 	return results, nil
+}
+
+// RunCDNHitRate benchmarks hit rates using the CDN production trace.
+func RunCDNHitRate(sizes []int) ([]HitRateResult, error) {
+	return runStringHitRate(trace.LoadCDNTrace, CDNEntrySize, sizes, "CDN")
 }
 
 // runStringTrace runs a hit rate benchmark using string keys.
@@ -106,13 +102,13 @@ func RunMetaHitRate(sizes []int) ([]HitRateResult, error) {
 	return results, nil
 }
 
-func runMetaTrace(factory cache.Factory, ops []trace.TraceOp, cacheSize int) float64 {
+func runMetaTrace(factory cache.Factory, ops []trace.Op, cacheSize int) float64 {
 	c := factory(cacheSize)
 	defer c.Close()
 
 	var hits, misses int64
 	for _, op := range ops {
-		switch op.Op {
+		switch op.Action {
 		case "GET":
 			if _, ok := c.Get(op.Key); ok {
 				hits++
@@ -122,6 +118,8 @@ func runMetaTrace(factory cache.Factory, ops []trace.TraceOp, cacheSize int) flo
 			}
 		case "SET":
 			c.Set(op.Key, op.Key)
+		default:
+			// ignore unknown operations
 		}
 	}
 	return float64(hits) / float64(hits+misses) * 100
@@ -165,138 +163,30 @@ func runZipfTrace(factory cache.Factory, keys []int, cacheSize int) float64 {
 
 // RunTwitterHitRate benchmarks hit rates using the Twitter production trace.
 func RunTwitterHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadTwitterTrace()
-	if err != nil {
-		return nil, fmt.Errorf("load Twitter trace: %w", err)
-	}
-
-	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(TwitterEntrySize) {
-		c := factory(sizes[0])
-		name := c.Name()
-		c.Close()
-
-		rates := make(map[int]float64)
-		for _, size := range sizes {
-			rates[size] = runStringTrace(factory, ops, size)
-		}
-		results = append(results, HitRateResult{Name: name, Rates: rates})
-	}
-
-	return results, nil
+	return runStringHitRate(trace.LoadTwitterTrace, TwitterEntrySize, sizes, "Twitter")
 }
 
 // RunWikipediaHitRate benchmarks hit rates using the Wikipedia CDN upload trace.
 func RunWikipediaHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadWikipediaTrace()
-	if err != nil {
-		return nil, fmt.Errorf("load Wikipedia trace: %w", err)
-	}
-
-	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(WikipediaEntrySize) {
-		c := factory(sizes[0])
-		name := c.Name()
-		c.Close()
-
-		rates := make(map[int]float64)
-		for _, size := range sizes {
-			rates[size] = runStringTrace(factory, ops, size)
-		}
-		results = append(results, HitRateResult{Name: name, Rates: rates})
-	}
-
-	return results, nil
+	return runStringHitRate(trace.LoadWikipediaTrace, WikipediaEntrySize, sizes, "Wikipedia")
 }
 
 // RunThesiosBlockHitRate benchmarks hit rates using the Google Thesios I/O block trace.
 func RunThesiosBlockHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadThesiosBlockTrace()
-	if err != nil {
-		return nil, fmt.Errorf("load Thesios block trace: %w", err)
-	}
-
-	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(ThesiosBlockEntrySize) {
-		c := factory(sizes[0])
-		name := c.Name()
-		c.Close()
-
-		rates := make(map[int]float64)
-		for _, size := range sizes {
-			rates[size] = runStringTrace(factory, ops, size)
-		}
-		results = append(results, HitRateResult{Name: name, Rates: rates})
-	}
-
-	return results, nil
+	return runStringHitRate(trace.LoadThesiosBlockTrace, ThesiosBlockEntrySize, sizes, "Thesios block")
 }
 
 // RunThesiosFileHitRate benchmarks hit rates using the Google Thesios I/O file trace.
 func RunThesiosFileHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadThesiosFileTrace()
-	if err != nil {
-		return nil, fmt.Errorf("load Thesios file trace: %w", err)
-	}
-
-	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(ThesiosFileEntrySize) {
-		c := factory(sizes[0])
-		name := c.Name()
-		c.Close()
-
-		rates := make(map[int]float64)
-		for _, size := range sizes {
-			rates[size] = runStringTrace(factory, ops, size)
-		}
-		results = append(results, HitRateResult{Name: name, Rates: rates})
-	}
-
-	return results, nil
+	return runStringHitRate(trace.LoadThesiosFileTrace, ThesiosFileEntrySize, sizes, "Thesios file")
 }
 
 // RunIBMDockerHitRate benchmarks hit rates using the IBM Docker Registry trace.
 func RunIBMDockerHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadIBMDockerTrace()
-	if err != nil {
-		return nil, fmt.Errorf("load IBM Docker trace: %w", err)
-	}
-
-	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(IBMDockerEntrySize) {
-		c := factory(sizes[0])
-		name := c.Name()
-		c.Close()
-
-		rates := make(map[int]float64)
-		for _, size := range sizes {
-			rates[size] = runStringTrace(factory, ops, size)
-		}
-		results = append(results, HitRateResult{Name: name, Rates: rates})
-	}
-
-	return results, nil
+	return runStringHitRate(trace.LoadIBMDockerTrace, IBMDockerEntrySize, sizes, "IBM Docker")
 }
 
 // RunTencentPhotoHitRate benchmarks hit rates using the Tencent Photo trace.
 func RunTencentPhotoHitRate(sizes []int) ([]HitRateResult, error) {
-	ops, err := trace.LoadTencentPhotoTrace()
-	if err != nil {
-		return nil, fmt.Errorf("load Tencent Photo trace: %w", err)
-	}
-
-	results := make([]HitRateResult, 0, len(cache.All()))
-	for _, factory := range cache.AllWithEntrySize(TencentPhotoEntrySize) {
-		c := factory(sizes[0])
-		name := c.Name()
-		c.Close()
-
-		rates := make(map[int]float64)
-		for _, size := range sizes {
-			rates[size] = runStringTrace(factory, ops, size)
-		}
-		results = append(results, HitRateResult{Name: name, Rates: rates})
-	}
-
-	return results, nil
+	return runStringHitRate(trace.LoadTencentPhotoTrace, TencentPhotoEntrySize, sizes, "Tencent Photo")
 }

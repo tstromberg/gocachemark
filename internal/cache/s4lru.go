@@ -7,10 +7,11 @@ import (
 )
 
 type s4lruCache struct {
-	mu sync.Mutex
 	c  *s4lru.Cache
+	mu sync.Mutex
 }
 
+// NewS4LRU creates a segmented LRU cache.
 func NewS4LRU(capacity int) Cache {
 	return &s4lruCache{c: s4lru.New(capacity)}
 }
@@ -22,7 +23,7 @@ func (c *s4lruCache) Get(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return v.(string), true
+	return v.(string), true //nolint:errcheck,revive // type is known from Set
 }
 
 func (c *s4lruCache) Set(key, value string) {
@@ -31,8 +32,8 @@ func (c *s4lruCache) Set(key, value string) {
 	c.mu.Unlock()
 }
 
-func (c *s4lruCache) Name() string {
+func (*s4lruCache) Name() string {
 	return "s4lru"
 }
 
-func (c *s4lruCache) Close() {}
+func (*s4lruCache) Close() {}

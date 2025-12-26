@@ -7,10 +7,11 @@ import (
 )
 
 type clockCache struct {
-	mu sync.Mutex
 	c  *clock.Cache[string, string]
+	mu sync.Mutex
 }
 
+// NewClock creates a clock-based cache.
 func NewClock(capacity int) Cache {
 	return &clockCache{
 		c: clock.NewCache[string, string](clock.WithCapacity(capacity)),
@@ -30,8 +31,8 @@ func (c *clockCache) Set(key, value string) {
 	c.mu.Unlock()
 }
 
-func (c *clockCache) Name() string {
+func (*clockCache) Name() string {
 	return "clock"
 }
 
-func (c *clockCache) Close() {}
+func (*clockCache) Close() {}

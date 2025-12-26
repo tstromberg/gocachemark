@@ -32,3 +32,6 @@ go.work.sum
 # .vscode/
 
 /gocachemark
+
+# added by lint-install
+out/

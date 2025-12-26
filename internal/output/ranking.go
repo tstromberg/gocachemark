@@ -6,10 +6,12 @@ import (
 	"github.com/tstromberg/gocachemark/internal/benchmark"
 )
 
-// Points awarded by placement: 1st=10, 2nd=7, 3rd=5, 4th=4, 5th=3, 6th=2, 7th=1
+// Points awarded by placement: 1st=10, 2nd=7, 3rd=5, 4th=4, 5th=3, 6th=2, 7th=1.
 var placementPoints = []float64{10, 7, 5, 4, 3, 2, 1}
 
 // ComputeRankings calculates overall rankings from benchmark results.
+//
+//nolint:gocognit,maintidx,revive // ranking logic necessarily complex to handle all benchmark types
 func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 	scores := make(map[string]float64)
 	medals := make(map[string][3]int) // [gold, silver, bronze]
@@ -71,7 +73,7 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			sorted := make([]benchmark.HitRateResult, len(b.data))
 			copy(sorted, b.data)
 			sort.Slice(sorted, func(i, j int) bool {
-				return avgHitRate(sorted[i], results.HitRate.Sizes) > avgHitRate(sorted[j], results.HitRate.Sizes)
+				return AvgHitRate(sorted[i], results.HitRate.Sizes) > AvgHitRate(sorted[j], results.HitRate.Sizes)
 			})
 			names := make([]string, len(sorted))
 			for i, r := range sorted {
@@ -96,7 +98,7 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			assignPoints("Latency", "String Keys", names)
 		}
 		if len(results.Latency.IntResults) > 0 {
-			sorted := make([]benchmark.IntLatencyResult, len(results.Latency.IntResults))
+			sorted := make([]benchmark.LatencyResult, len(results.Latency.IntResults))
 			copy(sorted, results.Latency.IntResults)
 			sort.Slice(sorted, func(i, j int) bool {
 				return (sorted[i].GetNsOp + sorted[i].SetNsOp) < (sorted[j].GetNsOp + sorted[j].SetNsOp)
@@ -123,13 +125,6 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 
 	// Throughput benchmarks - rank by average QPS (higher is better)
 	if results.Throughput != nil {
-		avgQPS := func(r benchmark.ThroughputResult) float64 {
-			var sum float64
-			for _, qps := range r.QPS {
-				sum += qps
-			}
-			return sum / float64(len(r.QPS))
-		}
 		throughputBenchmarks := []struct {
 			name string
 			data []benchmark.ThroughputResult
@@ -258,10 +253,19 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 	return result, &MedalTable{Categories: categories}
 }
 
-func avgHitRate(r benchmark.HitRateResult, sizes []int) float64 {
+// AvgHitRate computes the average hit rate across all cache sizes.
+func AvgHitRate(r benchmark.HitRateResult, sizes []int) float64 {
 	var sum float64
 	for _, size := range sizes {
 		sum += r.Rates[size]
 	}
 	return sum / float64(len(sizes))
+}
+
+func avgQPS(r benchmark.ThroughputResult) float64 {
+	var sum float64
+	for _, qps := range r.QPS {
+		sum += qps
+	}
+	return sum / float64(len(r.QPS))
 }

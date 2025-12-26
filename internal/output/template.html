@@ -888,10 +888,10 @@
     </table>
 
     {{if .Latency.IntResults}}
-    {{$sortedIntResults := sortByIntGetLatency .Latency.IntResults}}
-    {{$maxIntGet := maxIntLatency $sortedIntResults}}
-    {{$maxIntSet := maxIntSetLatency $sortedIntResults}}
-    {{$maxIntEvict := maxIntSetEvictLatency $sortedIntResults}}
+    {{$sortedIntResults := sortByGetLatency .Latency.IntResults}}
+    {{$maxIntGet := maxLatency $sortedIntResults}}
+    {{$maxIntSet := maxSetLatency $sortedIntResults}}
+    {{$maxIntEvict := maxSetEvictLatency $sortedIntResults}}
 
     <h3 style="margin-top: 40px;">Int Keys</h3>
 
@@ -919,7 +919,7 @@
             <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxIntEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
             <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
-            <td style="font-weight:bold;">{{ns (avgIntLatency .)}}</td>
+            <td style="font-weight:bold;">{{ns (avgLatency .)}}</td>
         </tr>
         {{end}}
         </tbody>
@@ -1158,7 +1158,7 @@ function createLineChart(canvasId, labels, datasets, yLabel, useLogY = false) {
         yAxisConfig.type = 'logarithmic';
         yAxisConfig.min = 1;
         yAxisConfig.ticks = {
-            callback: function(value, index, ticks) {
+            callback: (value, index, ticks) => {
                 if (value === 1 || value === 10 || value === 100 ||
                     value === 5 || value === 50) {
                     return value;
@@ -1261,56 +1261,21 @@ function toggleSection(toggleElement) {
     content.classList.toggle('collapsed');
 }
 
-function initCharts() {
-{{if .HitRate}}
-{{$sizes := .HitRate.Sizes}}
-{{if .HitRate.CDN}}
-createLineChart('cdnChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.CDN $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.Meta}}
-createLineChart('metaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Meta $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.Zipf}}
-createLineChart('zipfChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Zipf $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.Twitter}}
-createLineChart('twitterChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Twitter $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.Wikipedia}}
-createLineChart('wikipediaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Wikipedia $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.ThesiosBlock}}
-createLineChart('thesiosBlockChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosBlock $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.ThesiosFile}}
-createLineChart('thesiosFileChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosFile $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.IBMDocker}}
-createLineChart('ibmDockerChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.IBMDocker $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{if .HitRate.TencentPhoto}}
-createLineChart('tencentPhotoChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.TencentPhoto $sizes}}, 'Hit Rate (%)', false);
-{{end}}
-{{end}}
-
-{{if .Throughput}}
-{{$threads := .Throughput.Threads}}
-{{if .Throughput.StringGetResults}}
-createLineChart('throughputStringGetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.StringGetResults $threads}}, 'QPS');
-{{end}}
-{{if .Throughput.StringSetResults}}
-createLineChart('throughputStringSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.StringSetResults $threads}}, 'QPS');
-{{end}}
-{{if .Throughput.IntGetResults}}
-createLineChart('throughputIntGetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntGetResults $threads}}, 'QPS');
-{{end}}
-{{if .Throughput.IntSetResults}}
-createLineChart('throughputIntSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntSetResults $threads}}, 'QPS');
-{{end}}
-{{if .Throughput.GetOrSetResults}}
-createLineChart('throughputGetOrSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.GetOrSetResults $threads}}, 'QPS');
-{{end}}
-{{end}}
+function initCharts() {if .HitRate$sizes := .HitRate.Sizesif .HitRate.CDN
+createLineChart('cdnChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.CDN $sizes}}, 'Hit Rate (%)', false);endif .HitRate.Meta
+createLineChart('metaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Meta $sizes}}, 'Hit Rate (%)', false);endif .HitRate.Zipf
+createLineChart('zipfChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Zipf $sizes}}, 'Hit Rate (%)', false);endif .HitRate.Twitter
+createLineChart('twitterChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Twitter $sizes}}, 'Hit Rate (%)', false);endif .HitRate.Wikipedia
+createLineChart('wikipediaChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.Wikipedia $sizes}}, 'Hit Rate (%)', false);endif .HitRate.ThesiosBlock
+createLineChart('thesiosBlockChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosBlock $sizes}}, 'Hit Rate (%)', false);endif .HitRate.ThesiosFile
+createLineChart('thesiosFileChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.ThesiosFile $sizes}}, 'Hit Rate (%)', false);endif .HitRate.IBMDocker
+createLineChart('ibmDockerChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.IBMDocker $sizes}}, 'Hit Rate (%)', false);endif .HitRate.TencentPhoto
+createLineChart('tencentPhotoChart', {{sizeLabels $sizes}}, {{hitRateDatasets .HitRate.TencentPhoto $sizes}}, 'Hit Rate (%)', false);endendif .Throughput$threads := .Throughput.Threadsif .Throughput.StringGetResults
+createLineChart('throughputStringGetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.StringGetResults $threads}}, 'QPS');endif .Throughput.StringSetResults
+createLineChart('throughputStringSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.StringSetResults $threads}}, 'QPS');endif .Throughput.IntGetResults
+createLineChart('throughputIntGetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntGetResults $threads}}, 'QPS');endif .Throughput.IntSetResults
+createLineChart('throughputIntSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.IntSetResults $threads}}, 'QPS');endif .Throughput.GetOrSetResults
+createLineChart('throughputGetOrSetChart', {{threadLabels $threads}}, {{throughputDatasets .Throughput.GetOrSetResults $threads}}, 'QPS');endend
 }
 
 (function waitForChartAndDOM() {

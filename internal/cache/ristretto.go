@@ -6,8 +6,9 @@ type ristrettoCache struct {
 	c *ristretto.Cache
 }
 
+// NewRistretto creates a Ristretto cache.
 func NewRistretto(capacity int) Cache {
-	c, _ := ristretto.NewCache(&ristretto.Config{
+	c, _ := ristretto.NewCache(&ristretto.Config{ //nolint:errcheck // config always valid
 		NumCounters:        int64(capacity) * 10,
 		MaxCost:            int64(capacity),
 		BufferItems:        64,
@@ -21,14 +22,14 @@ func (c *ristrettoCache) Get(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return v.(string), true
+	return v.(string), true //nolint:errcheck,revive // type is known from Set
 }
 
 func (c *ristrettoCache) Set(key, value string) {
 	c.c.Set(key, value, 1)
 }
 
-func (c *ristrettoCache) Name() string {
+func (*ristrettoCache) Name() string {
 	return "ristretto"
 }
 

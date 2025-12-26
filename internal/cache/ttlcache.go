@@ -10,10 +10,11 @@ type ttlcacheCache struct {
 	c *ttlcache.Cache[string, string]
 }
 
+// NewTTLCache creates a TTL-based cache.
 func NewTTLCache(capacity int) Cache {
 	c := ttlcache.New[string, string](
-		ttlcache.WithCapacity[string, string](uint64(capacity)),
-		ttlcache.WithTTL[string, string](time.Hour), // Long TTL since we're testing capacity, not expiration
+		ttlcache.WithCapacity[string, string](uint64(capacity)), //nolint:gosec // capacity always positive
+		ttlcache.WithTTL[string, string](time.Hour),             // Long TTL since we're testing capacity, not expiration
 	)
 	go c.Start()
 	return &ttlcacheCache{c: c}
@@ -31,7 +32,7 @@ func (c *ttlcacheCache) Set(key, value string) {
 	c.c.Set(key, value, ttlcache.DefaultTTL)
 }
 
-func (c *ttlcacheCache) Name() string {
+func (*ttlcacheCache) Name() string {
 	return "ttlcache"
 }
 
@@ -48,9 +49,10 @@ type ttlcacheIntCache struct {
 	c *ttlcache.Cache[int, int]
 }
 
+// NewTTLCacheInt creates a TTL-based cache with int keys.
 func NewTTLCacheInt(capacity int) IntCache {
 	c := ttlcache.New[int, int](
-		ttlcache.WithCapacity[int, int](uint64(capacity)),
+		ttlcache.WithCapacity[int, int](uint64(capacity)), //nolint:gosec // capacity always positive
 		ttlcache.WithTTL[int, int](time.Hour),
 	)
 	go c.Start()
@@ -69,7 +71,7 @@ func (c *ttlcacheIntCache) Set(key, value int) {
 	c.c.Set(key, value, ttlcache.DefaultTTL)
 }
 
-func (c *ttlcacheIntCache) Name() string {
+func (*ttlcacheIntCache) Name() string {
 	return "ttlcache"
 }
 

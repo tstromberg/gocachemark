@@ -6,6 +6,7 @@ type multicacheCache struct {
 	c *multicache.Cache[string, string]
 }
 
+// NewMulticache creates a Multicache cache.
 func NewMulticache(capacity int) Cache {
 	return &multicacheCache{c: multicache.New[string, string](multicache.Size(capacity))}
 }
@@ -18,7 +19,7 @@ func (c *multicacheCache) Set(key, value string) {
 	c.c.Set(key, value)
 }
 
-func (c *multicacheCache) Name() string {
+func (*multicacheCache) Name() string {
 	return "multicache"
 }
 
@@ -35,6 +36,7 @@ type multicacheIntCache struct {
 	c *multicache.Cache[int, int]
 }
 
+// NewMulticacheInt creates a Multicache with int keys.
 func NewMulticacheInt(capacity int) IntCache {
 	return &multicacheIntCache{c: multicache.New[int, int](multicache.Size(capacity))}
 }
@@ -47,7 +49,7 @@ func (c *multicacheIntCache) Set(key, value int) {
 	c.c.Set(key, value)
 }
 
-func (c *multicacheIntCache) Name() string {
+func (*multicacheIntCache) Name() string {
 	return "multicache"
 }
 

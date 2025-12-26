@@ -6,8 +6,9 @@ type theineCache struct {
 	c *theine.Cache[string, string]
 }
 
+// NewTheine creates a Theine cache.
 func NewTheine(capacity int) Cache {
-	c, _ := theine.NewBuilder[string, string](int64(capacity)).Build()
+	c, _ := theine.NewBuilder[string, string](int64(capacity)).Build() //nolint:errcheck // capacity always valid
 	return &theineCache{c: c}
 }
 
@@ -19,7 +20,7 @@ func (c *theineCache) Set(key, value string) {
 	c.c.Set(key, value, 1)
 }
 
-func (c *theineCache) Name() string {
+func (*theineCache) Name() string {
 	return "theine"
 }
 
@@ -31,8 +32,9 @@ type theineIntCache struct {
 	c *theine.Cache[int, int]
 }
 
+// NewTheineInt creates a Theine cache with int keys.
 func NewTheineInt(capacity int) IntCache {
-	c, _ := theine.NewBuilder[int, int](int64(capacity)).Build()
+	c, _ := theine.NewBuilder[int, int](int64(capacity)).Build() //nolint:errcheck // capacity always valid
 	return &theineIntCache{c: c}
 }
 
@@ -44,7 +46,7 @@ func (c *theineIntCache) Set(key, value int) {
 	c.c.Set(key, value, 1)
 }
 
-func (c *theineIntCache) Name() string {
+func (*theineIntCache) Name() string {
 	return "theine"
 }
 

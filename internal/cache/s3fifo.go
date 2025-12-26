@@ -8,6 +8,7 @@ type s3fifoCache struct {
 	c *s3fifo.S3FIFO[string, string]
 }
 
+// NewS3FIFO creates an S3-FIFO cache.
 func NewS3FIFO(capacity int) Cache {
 	return &s3fifoCache{c: s3fifo.New[string, string](capacity, 0)}
 }
@@ -20,8 +21,8 @@ func (c *s3fifoCache) Set(key, value string) {
 	c.c.Set(key, value)
 }
 
-func (c *s3fifoCache) Name() string {
+func (*s3fifoCache) Name() string {
 	return "s3-fifo"
 }
 
-func (c *s3fifoCache) Close() {}
+func (*s3fifoCache) Close() {}

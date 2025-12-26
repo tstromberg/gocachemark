@@ -8,6 +8,7 @@ type sieveCache struct {
 	c *sieve.Sieve[string, string]
 }
 
+// NewSieve creates a SIEVE cache.
 func NewSieve(capacity int) Cache {
 	return &sieveCache{c: sieve.New[string, string](capacity, 0)}
 }
@@ -20,8 +21,8 @@ func (c *sieveCache) Set(key, value string) {
 	c.c.Set(key, value)
 }
 
-func (c *sieveCache) Name() string {
+func (*sieveCache) Name() string {
 	return "sieve"
 }
 
-func (c *sieveCache) Close() {}
+func (*sieveCache) Close() {}

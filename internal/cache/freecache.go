@@ -2,9 +2,6 @@ package cache
 
 import "github.com/coocood/freecache"
 
-// freecache internal overhead per entry (header, alignment, etc.)
-const freecacheOverhead = 32
-
 type freecacheCache struct {
 	c *freecache.Cache
 }
@@ -16,12 +13,11 @@ func NewFreecache(capacity int) Cache {
 }
 
 // NewFreecacheSized creates a freecache with a specific entry size.
-// entrySize should be key + value + freecacheOverhead.
+// entrySize should be key + value + internal overhead (~32 bytes).
 func NewFreecacheSized(capacity, entrySize int) Cache {
-	cacheBytes := capacity * entrySize
-	if cacheBytes < 512*1024 {
-		cacheBytes = 512 * 1024 // minimum 512KB
-	}
+	cacheBytes := max(capacity*entrySize,
+		// minimum 512KB
+		512*1024)
 	return &freecacheCache{c: freecache.NewCache(cacheBytes)}
 }
 
@@ -39,16 +35,16 @@ func (c *freecacheCache) Get(key string) (string, bool) {
 }
 
 func (c *freecacheCache) Set(key, value string) {
-	_ = c.c.Set([]byte(key), []byte(value), 0)
+	c.c.Set([]byte(key), []byte(value), 0) //nolint:errcheck,gosec // best-effort set
 }
 
-func (c *freecacheCache) Name() string {
+func (*freecacheCache) Name() string {
 	return "freecache"
 }
 
-func (c *freecacheCache) Close() {}
+func (*freecacheCache) Close() {}
 
 func (c *freecacheCache) GetOrSet(key, value string) string {
-	result, _ := c.c.GetOrSet([]byte(key), []byte(value), 0)
+	result, _ := c.c.GetOrSet([]byte(key), []byte(value), 0) //nolint:errcheck // best-effort
 	return string(result)
 }

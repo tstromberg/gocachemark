@@ -145,8 +145,8 @@ func writeLatencyMarkdown(w func(string, ...any), title string, data []benchmark
 	}
 
 	w("### %s\n\n", title)
-	w("| Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |\n")
-	w("|---------------|--------|-----------|--------|-----------|-------------|----------------|--------|\n")
+	w("| Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc |    Avg ns |\n")
+	w("|---------------|--------|-----------|--------|-----------|-------------|----------------|----------|\n")
 
 	sorted := make([]benchmark.LatencyResult, len(data))
 	copy(sorted, data)
@@ -156,7 +156,7 @@ func writeLatencyMarkdown(w func(string, ...any), title string, data []benchmark
 
 	for _, r := range sorted {
 		avg := (r.GetNsOp + r.SetNsOp) / 2
-		w("| %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
+		w("| %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %9.3f |\n",
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avg)
 	}
 

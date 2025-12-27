@@ -251,9 +251,10 @@ var templateFuncs = template.FuncMap{
 			return "background:#8b0000;color:#fff"
 		}
 	},
-	"pct":  func(f float64) string { return fmt.Sprintf("%.3f", f) },
-	"join": func(s []string) string { return strings.Join(s, ", ") },
-	"ns":   func(f float64) string { return fmt.Sprintf("%.1f", f) },
+	"pct":   func(f float64) string { return fmt.Sprintf("%.3f", f) },
+	"join":  func(s []string) string { return strings.Join(s, ", ") },
+	"ns":    func(f float64) string { return fmt.Sprintf("%.1f", f) },
+	"avgNs": func(f float64) string { return fmt.Sprintf("%.3f", f) },
 	"qps": func(f float64) string {
 		if f >= 1_000_000 {
 			return fmt.Sprintf("%.2fM", f/1_000_000)

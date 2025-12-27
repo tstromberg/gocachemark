@@ -881,7 +881,7 @@
             <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
             <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
-            <td style="font-weight:bold;">{{ns (avgLatency .)}}</td>
+            <td style="font-weight:bold;">{{avgNs (avgLatency .)}}</td>
         </tr>
         {{end}}
         </tbody>
@@ -919,7 +919,7 @@
             <td style="{{allocColor .SetAllocs}}">{{.SetAllocs}}</td>
             <td><div class="cell-bar-container"><div class="cell-bar evict" style="width: {{barWidth .SetEvictNsOp $maxIntEvict}}px"></div><span class="cell-value">{{ns .SetEvictNsOp}}</span></div></td>
             <td style="{{allocColor .SetEvictAllocs}}">{{.SetEvictAllocs}}</td>
-            <td style="font-weight:bold;">{{ns (avgLatency .)}}</td>
+            <td style="font-weight:bold;">{{avgNs (avgLatency .)}}</td>
         </tr>
         {{end}}
         </tbody>

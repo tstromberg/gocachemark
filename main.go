@@ -54,11 +54,11 @@ func printLatencyTable(results []benchmark.LatencyResult) {
 		return avgLatency(sorted[i]) < avgLatency(sorted[j])
 	})
 
-	fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc | Avg ns |")
-	fmt.Println("  |---------------|--------|-----------|--------|-----------|-------------|----------------|--------|")
+	fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc |    Avg ns |")
+	fmt.Println("  |---------------|--------|-----------|--------|-----------|-------------|----------------|-----------|")
 
 	for _, r := range sorted {
-		fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %6.0f |\n",
+		fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %9.3f |\n",
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
 	}
 
@@ -71,9 +71,9 @@ func printLatencyTable(results []benchmark.LatencyResult) {
 		bestScore := entries[0].Score
 
 		if len(winners) > 1 {
-			fmt.Printf("\n  winners (tie): %s (%.0f ns avg)", strings.Join(winners, ", "), bestScore)
+			fmt.Printf("\n  winners (tie): %s (%.3f ns avg)", strings.Join(winners, ", "), bestScore)
 		} else {
-			fmt.Printf("\n  winner: %s (%.0f ns avg)", winners[0], bestScore)
+			fmt.Printf("\n  winner: %s (%.3f ns avg)", winners[0], bestScore)
 		}
 		if runnerUp != nil {
 			pct := (runnerUp.Score - bestScore) / bestScore * 100

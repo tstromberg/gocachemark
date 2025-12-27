@@ -37,14 +37,14 @@ func main() {
 		return
 	}
 
-	runtime.GC() //nolint:revive // intentional GC for memory measurement
+	runtime.GC() //nolint:revive // intentional for memory measurement
 	debug.FreeOSMemory()
 
 	items, data := runBenchmark(*cacheName, *capacity, *valSize)
 
-	runtime.GC() //nolint:revive // intentional GC for memory measurement
+	runtime.GC() //nolint:revive // intentional for memory measurement
 	time.Sleep(100 * time.Millisecond)
-	runtime.GC() //nolint:revive // intentional GC for memory measurement
+	runtime.GC() //nolint:revive // intentional for memory measurement
 	debug.FreeOSMemory()
 
 	var mem runtime.MemStats

@@ -30,10 +30,10 @@ type jsonCategoryMedals struct {
 }
 
 type jsonBenchmarkMedal struct {
-	Name   string `json:"name"`
-	Gold   string `json:"gold,omitempty"`
-	Silver string `json:"silver,omitempty"`
-	Bronze string `json:"bronze,omitempty"`
+	Name   string   `json:"name"`
+	Gold   []string `json:"gold,omitempty"`
+	Silver []string `json:"silver,omitempty"`
+	Bronze []string `json:"bronze,omitempty"`
 }
 
 type jsonCategoryRank struct {

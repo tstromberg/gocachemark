@@ -570,9 +570,9 @@
                 {{range .Benchmarks}}
                     <tr>
                         <td>{{.Name}}</td>
-                        <td class="cache-cell gold-cell">{{.Gold}}</td>
-                        <td class="cache-cell silver-cell">{{.Silver}}</td>
-                        <td class="cache-cell bronze-cell">{{.Bronze}}</td>
+                        <td class="cache-cell gold-cell">{{join .Gold}}</td>
+                        <td class="cache-cell silver-cell">{{join .Silver}}</td>
+                        <td class="cache-cell bronze-cell">{{join .Bronze}}</td>
                     </tr>
                 {{end}}
                 </tbody>

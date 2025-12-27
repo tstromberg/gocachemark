@@ -62,11 +62,24 @@ func printLatencyTable(results []benchmark.LatencyResult) {
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
 	}
 
-	if len(sorted) >= 2 {
-		best := sorted[0]
-		second := sorted[1]
-		pct := (avgLatency(second) - avgLatency(best)) / avgLatency(best) * 100
-		fmt.Printf("\n  winner: %s (%.0f ns avg, %s is %.1f%% slower)\n", best.Name, avgLatency(best), second.Name, pct)
+	if len(sorted) >= 1 {
+		entries := make([]output.WinnerEntry, len(sorted))
+		for i, r := range sorted {
+			entries[i] = output.WinnerEntry{Name: r.Name, Score: avgLatency(r)}
+		}
+		winners, runnerUp := output.FormatWinners(entries)
+		bestScore := entries[0].Score
+
+		if len(winners) > 1 {
+			fmt.Printf("\n  winners (tie): %s (%.0f ns avg)", strings.Join(winners, ", "), bestScore)
+		} else {
+			fmt.Printf("\n  winner: %s (%.0f ns avg)", winners[0], bestScore)
+		}
+		if runnerUp != nil {
+			pct := (runnerUp.Score - bestScore) / bestScore * 100
+			fmt.Printf(", %s is %.1f%% slower", runnerUp.Name, pct)
+		}
+		fmt.Println()
 	}
 	fmt.Println()
 }
@@ -455,29 +468,40 @@ func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
 	for _, size := range sizes {
 		fmt.Printf(" %5dK |", size/1024)
 	}
-	fmt.Println("    Avg |")
+	fmt.Println("     Avg |")
 
 	fmt.Print("  |---------------|")
 	for range sizes {
 		fmt.Print("--------|")
 	}
-	fmt.Println("--------|")
+	fmt.Println("---------|")
 
 	for _, r := range sorted {
 		fmt.Printf("  | %-13s |", r.Name)
 		for _, size := range sizes {
 			fmt.Printf(" %5.2f%% |", r.Rates[size])
 		}
-		fmt.Printf(" %5.2f%% |\n", output.AvgHitRate(r, sizes))
+		fmt.Printf(" %6.3f%% |\n", output.AvgHitRate(r, sizes))
 	}
 
-	if len(sorted) >= 2 {
-		best := sorted[0]
-		second := sorted[1]
-		bestAvg := output.AvgHitRate(best, sizes)
-		secondAvg := output.AvgHitRate(second, sizes)
-		pct := (bestAvg - secondAvg) / secondAvg * 100
-		fmt.Printf("\n  winner: %s (%.2f%% avg, +%.2f%% vs %s)\n", best.Name, bestAvg, pct, second.Name)
+	if len(sorted) >= 1 {
+		entries := make([]output.WinnerEntry, len(sorted))
+		for i, r := range sorted {
+			entries[i] = output.WinnerEntry{Name: r.Name, Score: output.AvgHitRate(r, sizes)}
+		}
+		winners, runnerUp := output.FormatWinners(entries)
+		bestScore := entries[0].Score
+
+		if len(winners) > 1 {
+			fmt.Printf("\n  winners (tie): %s (%.3f%% avg)", strings.Join(winners, ", "), bestScore)
+		} else {
+			fmt.Printf("\n  winner: %s (%.3f%% avg)", winners[0], bestScore)
+		}
+		if runnerUp != nil {
+			pct := (bestScore - runnerUp.Score) / runnerUp.Score * 100
+			fmt.Printf(", +%.3f%% vs %s", pct, runnerUp.Name)
+		}
+		fmt.Println()
 	}
 	fmt.Println()
 }
@@ -516,11 +540,24 @@ func runLatencyBenchmarks() *output.LatencyData {
 				fmt.Printf("  | %-13s | %11.0f | %14d |\n", r.Name, r.NsOp, r.Allocs)
 			}
 
-			if len(sorted) >= 2 {
-				best := sorted[0]
-				second := sorted[1]
-				pct := (second.NsOp - best.NsOp) / best.NsOp * 100
-				fmt.Printf("\n  winner: %s (%.0f ns, %s is %.1f%% slower)\n", best.Name, best.NsOp, second.Name, pct)
+			if len(sorted) >= 1 {
+				entries := make([]output.WinnerEntry, len(sorted))
+				for i, r := range sorted {
+					entries[i] = output.WinnerEntry{Name: r.Name, Score: r.NsOp}
+				}
+				winners, runnerUp := output.FormatWinners(entries)
+				bestScore := entries[0].Score
+
+				if len(winners) > 1 {
+					fmt.Printf("\n  winners (tie): %s (%.0f ns)", strings.Join(winners, ", "), bestScore)
+				} else {
+					fmt.Printf("\n  winner: %s (%.0f ns)", winners[0], bestScore)
+				}
+				if runnerUp != nil {
+					pct := (runnerUp.Score - bestScore) / bestScore * 100
+					fmt.Printf(", %s is %.1f%% slower", runnerUp.Name, pct)
+				}
+				fmt.Println()
 			}
 			fmt.Println()
 		}
@@ -588,13 +625,24 @@ func runThroughputBenchmarks() *output.ThroughputData {
 			}
 		}
 
-		if len(sorted) >= 2 {
-			best := sorted[0]
-			second := sorted[1]
-			bestAvg := avgQPS(best)
-			secondAvg := avgQPS(second)
-			pct := (bestAvg - secondAvg) / secondAvg * 100
-			fmt.Printf("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+		if len(sorted) >= 1 {
+			entries := make([]output.WinnerEntry, len(sorted))
+			for i, r := range sorted {
+				entries[i] = output.WinnerEntry{Name: r.Name, Score: avgQPS(r)}
+			}
+			winners, runnerUp := output.FormatWinners(entries)
+			bestScore := entries[0].Score
+
+			if len(winners) > 1 {
+				fmt.Printf("\n  winners (tie): %s", strings.Join(winners, ", "))
+			} else {
+				fmt.Printf("\n  winner: %s", winners[0])
+			}
+			if runnerUp != nil {
+				pct := (bestScore - runnerUp.Score) / runnerUp.Score * 100
+				fmt.Printf(" (+%.1f%% vs %s)", pct, runnerUp.Name)
+			}
+			fmt.Println()
 		}
 		fmt.Println()
 	}
@@ -666,11 +714,23 @@ func runMemoryBenchmarks() *output.MemoryData {
 			r.Name, r.Items, mb, r.BytesPerItem)
 	}
 
-	if len(results) >= 2 {
-		best := results[0]
-		second := results[1]
-		savings := float64(second.Bytes-best.Bytes) / float64(second.Bytes) * 100
-		fmt.Printf("\n  winner: %s (%.1f%% less memory vs %s)\n", best.Name, savings, second.Name)
+	if len(results) >= 1 {
+		entries := make([]output.WinnerEntry, len(results))
+		for i, r := range results {
+			entries[i] = output.WinnerEntry{Name: r.Name, Score: float64(r.Bytes)}
+		}
+		winners, runnerUp := output.FormatWinners(entries)
+
+		if len(winners) > 1 {
+			fmt.Printf("\n  winners (tie): %s", strings.Join(winners, ", "))
+		} else {
+			fmt.Printf("\n  winner: %s", winners[0])
+		}
+		if runnerUp != nil {
+			savings := (runnerUp.Score - entries[0].Score) / runnerUp.Score * 100
+			fmt.Printf(" (%.1f%% less memory vs %s)", savings, runnerUp.Name)
+		}
+		fmt.Println()
 	}
 	fmt.Println()
 

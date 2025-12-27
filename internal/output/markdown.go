@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/tstromberg/gocachemark/internal/benchmark"
 )
@@ -91,14 +92,14 @@ func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.
 	for _, size := range sizes {
 		w(" %5dK |", size/1024)
 	}
-	w("    Avg |\n")
+	w("     Avg |\n")
 
 	// Separator
 	w("|---------------|")
 	for range sizes {
 		w("--------|")
 	}
-	w("--------|\n")
+	w("---------|\n")
 
 	// Sort by average
 	sorted := make([]benchmark.HitRateResult, len(data))
@@ -113,16 +114,27 @@ func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.
 		for _, size := range sizes {
 			w(" %5.2f%% |", r.Rates[size])
 		}
-		w(" %5.2f%% |\n", AvgHitRate(r, sizes))
+		w(" %6.3f%% |\n", AvgHitRate(r, sizes))
 	}
 
 	// Winner line
-	if len(sorted) >= 2 {
-		best, second := sorted[0], sorted[1]
-		bestAvg := AvgHitRate(best, sizes)
-		secondAvg := AvgHitRate(second, sizes)
-		pct := ((bestAvg - secondAvg) / secondAvg) * 100
-		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	if len(sorted) >= 1 {
+		entries := make([]WinnerEntry, len(sorted))
+		for i, r := range sorted {
+			entries[i] = WinnerEntry{Name: r.Name, Score: AvgHitRate(r, sizes)}
+		}
+		winners, runnerUp := FormatWinners(entries)
+
+		if len(winners) > 1 {
+			w("\n  winners (tie): %s", strings.Join(winners, ", "))
+		} else {
+			w("\n  winner: %s", winners[0])
+		}
+		if runnerUp != nil {
+			pct := (entries[0].Score - runnerUp.Score) / runnerUp.Score * 100
+			w(" (+%.3f%% vs %s)", pct, runnerUp.Name)
+		}
+		w("\n")
 	}
 	w("\n")
 }
@@ -148,12 +160,23 @@ func writeLatencyMarkdown(w func(string, ...any), title string, data []benchmark
 			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avg)
 	}
 
-	if len(sorted) >= 2 {
-		best, second := sorted[0], sorted[1]
-		bestAvg := (best.GetNsOp + best.SetNsOp) / 2
-		secondAvg := (second.GetNsOp + second.SetNsOp) / 2
-		pct := ((secondAvg - bestAvg) / bestAvg) * 100
-		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	if len(sorted) >= 1 {
+		entries := make([]WinnerEntry, len(sorted))
+		for i, r := range sorted {
+			entries[i] = WinnerEntry{Name: r.Name, Score: (r.GetNsOp + r.SetNsOp) / 2}
+		}
+		winners, runnerUp := FormatWinners(entries)
+
+		if len(winners) > 1 {
+			w("\n  winners (tie): %s", strings.Join(winners, ", "))
+		} else {
+			w("\n  winner: %s", winners[0])
+		}
+		if runnerUp != nil {
+			pct := (runnerUp.Score - entries[0].Score) / entries[0].Score * 100
+			w(" (+%.3f%% vs %s)", pct, runnerUp.Name)
+		}
+		w("\n")
 	}
 	w("\n")
 }
@@ -178,10 +201,23 @@ func writeGetOrSetLatencyMarkdown(w func(string, ...any), data []benchmark.GetOr
 	}
 
 	// Winner line
-	if len(sorted) >= 2 {
-		best, second := sorted[0], sorted[1]
-		pct := ((second.NsOp - best.NsOp) / best.NsOp) * 100
-		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	if len(sorted) >= 1 {
+		entries := make([]WinnerEntry, len(sorted))
+		for i, r := range sorted {
+			entries[i] = WinnerEntry{Name: r.Name, Score: r.NsOp}
+		}
+		winners, runnerUp := FormatWinners(entries)
+
+		if len(winners) > 1 {
+			w("\n  winners (tie): %s", strings.Join(winners, ", "))
+		} else {
+			w("\n  winner: %s", winners[0])
+		}
+		if runnerUp != nil {
+			pct := (runnerUp.Score - entries[0].Score) / entries[0].Score * 100
+			w(" (+%.3f%% vs %s)", pct, runnerUp.Name)
+		}
+		w("\n")
 	}
 	w("\n")
 }
@@ -234,12 +270,23 @@ func writeThroughputMarkdown(w func(string, ...any), name string, data []benchma
 	}
 
 	// Winner line
-	if len(sorted) >= 2 {
-		best, second := sorted[0], sorted[1]
-		bestAvg := avgQPS(best)
-		secondAvg := avgQPS(second)
-		pct := ((bestAvg - secondAvg) / secondAvg) * 100
-		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	if len(sorted) >= 1 {
+		entries := make([]WinnerEntry, len(sorted))
+		for i, r := range sorted {
+			entries[i] = WinnerEntry{Name: r.Name, Score: avgQPS(r)}
+		}
+		winners, runnerUp := FormatWinners(entries)
+
+		if len(winners) > 1 {
+			w("\n  winners (tie): %s", strings.Join(winners, ", "))
+		} else {
+			w("\n  winner: %s", winners[0])
+		}
+		if runnerUp != nil {
+			pct := (entries[0].Score - runnerUp.Score) / runnerUp.Score * 100
+			w(" (+%.3f%% vs %s)", pct, runnerUp.Name)
+		}
+		w("\n")
 	}
 	w("\n")
 }
@@ -264,10 +311,23 @@ func writeMemoryMarkdown(w func(string, ...any), data []benchmark.MemoryResult) 
 	}
 
 	// Winner line (lowest memory usage)
-	if len(data) >= 2 {
-		best, second := data[0], data[1]
-		pct := (float64(second.Bytes-best.Bytes) / float64(best.Bytes)) * 100
-		w("\n  winner: %s (+%.1f%% vs %s)\n", best.Name, pct, second.Name)
+	if len(data) >= 1 {
+		entries := make([]WinnerEntry, len(data))
+		for i, r := range data {
+			entries[i] = WinnerEntry{Name: r.Name, Score: float64(r.Bytes)}
+		}
+		winners, runnerUp := FormatWinners(entries)
+
+		if len(winners) > 1 {
+			w("\n  winners (tie): %s", strings.Join(winners, ", "))
+		} else {
+			w("\n  winner: %s", winners[0])
+		}
+		if runnerUp != nil {
+			pct := (runnerUp.Score - entries[0].Score) / entries[0].Score * 100
+			w(" (+%.3f%% vs %s)", pct, runnerUp.Name)
+		}
+		w("\n")
 	}
 	w("\n")
 }

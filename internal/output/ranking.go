@@ -1,6 +1,7 @@
 package output
 
 import (
+	"math"
 	"sort"
 
 	"github.com/tstromberg/gocachemark/internal/benchmark"
@@ -8,6 +9,44 @@ import (
 
 // Points awarded by placement: 1st=10, 2nd=7, 3rd=5, 4th=4, 5th=3, 6th=2, 7th=1.
 var placementPoints = []float64{10, 7, 5, 4, 3, 2, 1}
+
+// rankedEntry holds a name and score for tie detection.
+type rankedEntry struct {
+	name  string
+	score float64
+}
+
+// Round3 rounds to 3 decimal places for tie detection.
+func Round3(f float64) float64 {
+	return math.Round(f*1000) / 1000
+}
+
+// WinnerEntry represents a ranked entry for winner display.
+type WinnerEntry struct {
+	Name  string
+	Score float64
+}
+
+// FormatWinners returns winner names and the first runner-up for comparison.
+// If multiple entries tie for first, all are returned as winners.
+// Returns (winners, runnerUp) where runnerUp is nil if everyone ties or only one entry.
+func FormatWinners(entries []WinnerEntry) (winners []string, runnerUp *WinnerEntry) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	// Find all entries tied for first
+	bestScore := Round3(entries[0].Score)
+	for _, e := range entries {
+		if Round3(e.Score) != bestScore {
+			runnerUp = &WinnerEntry{Name: e.Name, Score: e.Score}
+			break
+		}
+		winners = append(winners, e.Name)
+	}
+
+	return winners, runnerUp
+}
 
 // ComputeRankings calculates overall rankings from benchmark results.
 //
@@ -19,34 +58,57 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 	categoryMedals := make(map[string]map[string][3]int)
 	categoryBenchmarks := make(map[string][]BenchmarkMedal)
 
-	assignPoints := func(category, name string, names []string) {
-		for i, n := range names {
-			if i < len(placementPoints) {
-				scores[n] += placementPoints[i]
-			}
-			if i < 3 {
-				m := medals[n]
-				m[i]++
-				medals[n] = m
+	// assignPoints handles tie detection: entries with scores equal to 3 decimal
+	// places share the same medal position. Entries must be pre-sorted by score.
+	assignPoints := func(category, benchName string, entries []rankedEntry) {
+		bm := BenchmarkMedal{Name: benchName}
+		pos := 0 // current medal position (0=gold, 1=silver, 2=bronze)
+		i := 0
 
-				if categoryMedals[category] == nil {
-					categoryMedals[category] = make(map[string][3]int)
-				}
-				cm := categoryMedals[category][n]
-				cm[i]++
-				categoryMedals[category][n] = cm
+		for i < len(entries) {
+			// Find all entries tied at this position
+			var tied []string
+			baseScore := Round3(entries[i].score)
+			for i < len(entries) && Round3(entries[i].score) == baseScore {
+				tied = append(tied, entries[i].name)
+				i++
 			}
+
+			// Assign points and medals to all tied entries
+			for _, n := range tied {
+				if pos < len(placementPoints) {
+					scores[n] += placementPoints[pos]
+				}
+				if pos < 3 {
+					m := medals[n]
+					m[pos]++
+					medals[n] = m
+
+					if categoryMedals[category] == nil {
+						categoryMedals[category] = make(map[string][3]int)
+					}
+					cm := categoryMedals[category][n]
+					cm[pos]++
+					categoryMedals[category][n] = cm
+				}
+			}
+
+			// Store tied winners in medal struct
+			if pos < 3 {
+				switch pos {
+				case 0:
+					bm.Gold = tied
+				case 1:
+					bm.Silver = tied
+				case 2:
+					bm.Bronze = tied
+				}
+			}
+
+			// Skip positions based on number of ties
+			pos += len(tied)
 		}
-		bm := BenchmarkMedal{Name: name}
-		if len(names) > 0 {
-			bm.Gold = names[0]
-		}
-		if len(names) > 1 {
-			bm.Silver = names[1]
-		}
-		if len(names) > 2 {
-			bm.Bronze = names[2]
-		}
+
 		categoryBenchmarks[category] = append(categoryBenchmarks[category], bm)
 	}
 
@@ -75,11 +137,11 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			sort.Slice(sorted, func(i, j int) bool {
 				return AvgHitRate(sorted[i], results.HitRate.Sizes) > AvgHitRate(sorted[j], results.HitRate.Sizes)
 			})
-			names := make([]string, len(sorted))
+			entries := make([]rankedEntry, len(sorted))
 			for i, r := range sorted {
-				names[i] = r.Name
+				entries[i] = rankedEntry{r.Name, AvgHitRate(r, results.HitRate.Sizes)}
 			}
-			assignPoints("Hit Rate", b.name, names)
+			assignPoints("Hit Rate", b.name, entries)
 		}
 	}
 
@@ -91,11 +153,11 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			sort.Slice(sorted, func(i, j int) bool {
 				return (sorted[i].GetNsOp + sorted[i].SetNsOp) < (sorted[j].GetNsOp + sorted[j].SetNsOp)
 			})
-			names := make([]string, len(sorted))
+			entries := make([]rankedEntry, len(sorted))
 			for i, r := range sorted {
-				names[i] = r.Name
+				entries[i] = rankedEntry{r.Name, (r.GetNsOp + r.SetNsOp) / 2}
 			}
-			assignPoints("Latency", "String Keys", names)
+			assignPoints("Latency", "String Keys", entries)
 		}
 		if len(results.Latency.IntResults) > 0 {
 			sorted := make([]benchmark.LatencyResult, len(results.Latency.IntResults))
@@ -103,11 +165,11 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			sort.Slice(sorted, func(i, j int) bool {
 				return (sorted[i].GetNsOp + sorted[i].SetNsOp) < (sorted[j].GetNsOp + sorted[j].SetNsOp)
 			})
-			names := make([]string, len(sorted))
+			entries := make([]rankedEntry, len(sorted))
 			for i, r := range sorted {
-				names[i] = r.Name
+				entries[i] = rankedEntry{r.Name, (r.GetNsOp + r.SetNsOp) / 2}
 			}
-			assignPoints("Latency", "Int Keys", names)
+			assignPoints("Latency", "Int Keys", entries)
 		}
 		if len(results.Latency.GetOrSetResults) > 0 {
 			sorted := make([]benchmark.GetOrSetLatencyResult, len(results.Latency.GetOrSetResults))
@@ -115,11 +177,11 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			sort.Slice(sorted, func(i, j int) bool {
 				return sorted[i].NsOp < sorted[j].NsOp
 			})
-			names := make([]string, len(sorted))
+			entries := make([]rankedEntry, len(sorted))
 			for i, r := range sorted {
-				names[i] = r.Name
+				entries[i] = rankedEntry{r.Name, r.NsOp}
 			}
-			assignPoints("Latency", "GetOrSet", names)
+			assignPoints("Latency", "GetOrSet", entries)
 		}
 	}
 
@@ -144,21 +206,21 @@ func ComputeRankings(results Results) ([]Ranking, *MedalTable) {
 			sort.Slice(sorted, func(i, j int) bool {
 				return avgQPS(sorted[i]) > avgQPS(sorted[j])
 			})
-			names := make([]string, len(sorted))
+			entries := make([]rankedEntry, len(sorted))
 			for i, r := range sorted {
-				names[i] = r.Name
+				entries[i] = rankedEntry{r.Name, avgQPS(r)}
 			}
-			assignPoints("Throughput", b.name, names)
+			assignPoints("Throughput", b.name, entries)
 		}
 	}
 
 	// Memory benchmark - rank by memory usage (lower is better)
 	if results.Memory != nil && len(results.Memory.Results) > 0 {
-		names := make([]string, len(results.Memory.Results))
+		entries := make([]rankedEntry, len(results.Memory.Results))
 		for i, r := range results.Memory.Results {
-			names[i] = r.Name
+			entries[i] = rankedEntry{r.Name, float64(r.Bytes)}
 		}
-		assignPoints("Memory", "Overhead", names)
+		assignPoints("Memory", "Overhead", entries)
 	}
 
 	if len(scores) == 0 {

@@ -181,14 +181,17 @@ func main() {
 
 	if suiteFilter["hitrate"] {
 		results.HitRate = runHitRateBenchmarks()
+		printHitRateSummary(results.HitRate)
 	}
 
 	if suiteFilter["latency"] {
 		results.Latency = runLatencyBenchmarks()
+		printLatencySummary(results.Latency)
 	}
 
 	if suiteFilter["throughput"] {
 		results.Throughput = runThroughputBenchmarks()
+		printThroughputSummary(results.Throughput)
 	}
 
 	if suiteFilter["memory"] {
@@ -498,8 +501,8 @@ func printHitRateTable(results []benchmark.HitRateResult, sizes []int) {
 			fmt.Printf("\n  winner: %s (%.3f%% avg)", winners[0], bestScore)
 		}
 		if runnerUp != nil {
-			pct := (bestScore - runnerUp.Score) / runnerUp.Score * 100
-			fmt.Printf(", +%.3f%% vs %s", pct, runnerUp.Name)
+			diff := bestScore - runnerUp.Score
+			fmt.Printf(", +%.3f%% vs %s", diff, runnerUp.Name)
 		}
 		fmt.Println()
 	}
@@ -597,7 +600,7 @@ func runThroughputBenchmarks() *output.ThroughputData {
 
 		fmt.Print("  | Cache         |")
 		for _, t := range threads {
-			fmt.Printf(" %2dT       |", t)
+			fmt.Printf("   %2dT     |", t)
 		}
 		fmt.Println("       Avg |")
 
@@ -612,16 +615,16 @@ func runThroughputBenchmarks() *output.ThroughputData {
 			for _, t := range threads {
 				qps := r.QPS[t]
 				if qps >= 1_000_000 {
-					fmt.Printf(" %6.2fM   |", qps/1_000_000)
+					fmt.Printf(" %8.2fM |", qps/1_000_000)
 				} else {
-					fmt.Printf(" %6.0fK   |", qps/1_000)
+					fmt.Printf(" %8.0fK |", qps/1_000)
 				}
 			}
 			avg := avgQPS(r)
 			if avg >= 1_000_000 {
-				fmt.Printf(" %6.2fM   |\n", avg/1_000_000)
+				fmt.Printf(" %8.2fM |\n", avg/1_000_000)
 			} else {
-				fmt.Printf(" %6.0fK   |\n", avg/1_000)
+				fmt.Printf(" %8.0fK |\n", avg/1_000)
 			}
 		}
 
@@ -735,6 +738,81 @@ func runMemoryBenchmarks() *output.MemoryData {
 	fmt.Println()
 
 	return &output.MemoryData{Results: results, Capacity: capacity, ValSize: valSize}
+}
+
+func printHitRateSummary(data *output.HitRateData) {
+	summary, numTests, filtered := output.ComputeHitRateSummary(data)
+	if len(summary) == 0 {
+		return
+	}
+
+	if filtered {
+		fmt.Printf("  Category Summary (%d tests, caches that support all tested features):\n", numTests)
+	} else {
+		fmt.Printf("  Category Summary (%d tests):\n", numTests)
+	}
+	fmt.Println("  | Cache         |     Avg |       vs #1 |")
+	fmt.Println("  |---------------|---------|-------------|")
+	for _, s := range summary {
+		diff := ""
+		if s.DiffFromFirst > 0 {
+			diff = fmt.Sprintf("(-%.2f%%)", s.DiffFromFirst)
+		}
+		fmt.Printf("  | %-13s | %6.2f%% | %11s |\n", s.Name, s.Value, diff)
+	}
+	fmt.Println()
+}
+
+func printLatencySummary(data *output.LatencyData) {
+	summary, numTests, filtered := output.ComputeLatencySummary(data)
+	if len(summary) == 0 {
+		return
+	}
+
+	if filtered {
+		fmt.Printf("  Category Summary (%d tests, caches that support all tested features):\n", numTests)
+	} else {
+		fmt.Printf("  Category Summary (%d tests):\n", numTests)
+	}
+	fmt.Println("  | Cache         |    Avg ns |       vs #1 |")
+	fmt.Println("  |---------------|-----------|-------------|")
+	for _, s := range summary {
+		diff := ""
+		if s.DiffFromFirst > 0 {
+			diff = fmt.Sprintf("(+%.1f%%)", s.DiffFromFirst)
+		}
+		fmt.Printf("  | %-13s | %9.2f | %11s |\n", s.Name, s.Value, diff)
+	}
+	fmt.Println()
+}
+
+func printThroughputSummary(data *output.ThroughputData) {
+	summary, numTests, filtered := output.ComputeThroughputSummary(data)
+	if len(summary) == 0 {
+		return
+	}
+
+	if filtered {
+		fmt.Printf("  Category Summary (%d tests, caches that support all tested features):\n", numTests)
+	} else {
+		fmt.Printf("  Category Summary (%d tests):\n", numTests)
+	}
+	fmt.Println("  | Cache         |       Avg |       vs #1 |")
+	fmt.Println("  |---------------|-----------|-------------|")
+	for _, s := range summary {
+		diff := ""
+		if s.DiffFromFirst > 0 {
+			diff = fmt.Sprintf("(+%.1f%%)", s.DiffFromFirst)
+		}
+		var avgStr string
+		if s.Value >= 1_000_000 {
+			avgStr = fmt.Sprintf("%6.2fM", s.Value/1_000_000)
+		} else {
+			avgStr = fmt.Sprintf("%6.0fK", s.Value/1_000)
+		}
+		fmt.Printf("  | %-13s | %9s | %11s |\n", s.Name, avgStr, diff)
+	}
+	fmt.Println()
 }
 
 func printOverallRanking(rankings []output.Ranking) {

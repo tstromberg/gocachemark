@@ -46,16 +46,23 @@ type jsonCategoryRank struct {
 }
 
 type jsonHitRateData struct {
-	Sizes        []int               `json:"sizes"`
-	CDN          []jsonHitRateResult `json:"cdn,omitempty"`
-	Meta         []jsonHitRateResult `json:"meta,omitempty"`
-	Zipf         []jsonHitRateResult `json:"zipf,omitempty"`
-	Twitter      []jsonHitRateResult `json:"twitter,omitempty"`
-	Wikipedia    []jsonHitRateResult `json:"wikipedia,omitempty"`
-	ThesiosBlock []jsonHitRateResult `json:"thesiosBlock,omitempty"`
-	ThesiosFile  []jsonHitRateResult `json:"thesiosFile,omitempty"`
-	IBMDocker    []jsonHitRateResult `json:"ibmDocker,omitempty"`
-	TencentPhoto []jsonHitRateResult `json:"tencentPhoto,omitempty"`
+	Sizes        []int                 `json:"sizes"`
+	CDN          []jsonHitRateResult   `json:"cdn,omitempty"`
+	Meta         []jsonHitRateResult   `json:"meta,omitempty"`
+	Zipf         []jsonHitRateResult   `json:"zipf,omitempty"`
+	Twitter      []jsonHitRateResult   `json:"twitter,omitempty"`
+	Wikipedia    []jsonHitRateResult   `json:"wikipedia,omitempty"`
+	ThesiosBlock []jsonHitRateResult   `json:"thesiosBlock,omitempty"`
+	ThesiosFile  []jsonHitRateResult   `json:"thesiosFile,omitempty"`
+	IBMDocker    []jsonHitRateResult   `json:"ibmDocker,omitempty"`
+	TencentPhoto []jsonHitRateResult   `json:"tencentPhoto,omitempty"`
+	Summary      []jsonCategorySummary `json:"summary,omitempty"`
+}
+
+type jsonCategorySummary struct {
+	Name          string  `json:"name"`
+	Value         float64 `json:"value"`
+	DiffFromFirst float64 `json:"diffFromFirstPct"`
 }
 
 type jsonHitRateResult struct {
@@ -65,9 +72,10 @@ type jsonHitRateResult struct {
 }
 
 type jsonLatencyData struct {
-	StringKeys []jsonLatencyResult  `json:"stringKeys,omitempty"`
-	IntKeys    []jsonLatencyResult  `json:"intKeys,omitempty"`
-	GetOrSet   []jsonGetOrSetResult `json:"getOrSet,omitempty"`
+	StringKeys []jsonLatencyResult   `json:"stringKeys,omitempty"`
+	IntKeys    []jsonLatencyResult   `json:"intKeys,omitempty"`
+	GetOrSet   []jsonGetOrSetResult  `json:"getOrSet,omitempty"`
+	Summary    []jsonCategorySummary `json:"summary,omitempty"`
 }
 
 type jsonLatencyResult struct {
@@ -94,6 +102,7 @@ type jsonThroughput struct {
 	IntGet    []jsonThroughputResult `json:"intGet,omitempty"`
 	IntSet    []jsonThroughputResult `json:"intSet,omitempty"`
 	GetOrSet  []jsonThroughputResult `json:"getOrSet,omitempty"`
+	Summary   []jsonCategorySummary  `json:"summary,omitempty"`
 }
 
 type jsonThroughputResult struct {
@@ -176,6 +185,7 @@ func convertMedalTable(mt *MedalTable) *jsonMedalTable {
 }
 
 func convertHitRate(hr *HitRateData) *jsonHitRateData {
+	summary, _, _ := ComputeHitRateSummary(hr)
 	return &jsonHitRateData{
 		Sizes:        hr.Sizes,
 		CDN:          convertHitRateResults(hr.CDN, hr.Sizes),
@@ -187,6 +197,7 @@ func convertHitRate(hr *HitRateData) *jsonHitRateData {
 		ThesiosFile:  convertHitRateResults(hr.ThesiosFile, hr.Sizes),
 		IBMDocker:    convertHitRateResults(hr.IBMDocker, hr.Sizes),
 		TencentPhoto: convertHitRateResults(hr.TencentPhoto, hr.Sizes),
+		Summary:      convertCategorySummary(summary),
 	}
 }
 
@@ -242,10 +253,13 @@ func convertLatency(lat *LatencyData) *jsonLatencyData {
 		})
 	}
 
+	summary, _, _ := ComputeLatencySummary(lat)
+	jl.Summary = convertCategorySummary(summary)
 	return jl
 }
 
 func convertThroughput(tp *ThroughputData) *jsonThroughput {
+	summary, _, _ := ComputeThroughputSummary(tp)
 	return &jsonThroughput{
 		Threads:   tp.Threads,
 		StringGet: convertThroughputResults(tp.StringGetResults),
@@ -253,6 +267,7 @@ func convertThroughput(tp *ThroughputData) *jsonThroughput {
 		IntGet:    convertThroughputResults(tp.IntGetResults),
 		IntSet:    convertThroughputResults(tp.IntSetResults),
 		GetOrSet:  convertThroughputResults(tp.GetOrSetResults),
+		Summary:   convertCategorySummary(summary),
 	}
 }
 
@@ -266,6 +281,21 @@ func convertThroughputResults(results []benchmark.ThroughputResult) []jsonThroug
 			Name:   r.Name,
 			QPS:    r.QPS,
 			AvgQPS: avgQPS(r),
+		}
+	}
+	return out
+}
+
+func convertCategorySummary(summaries []CategorySummary) []jsonCategorySummary {
+	if len(summaries) == 0 {
+		return nil
+	}
+	out := make([]jsonCategorySummary, len(summaries))
+	for i, s := range summaries {
+		out[i] = jsonCategorySummary{
+			Name:          s.Name,
+			Value:         s.Value,
+			DiffFromFirst: s.DiffFromFirst,
 		}
 	}
 	return out

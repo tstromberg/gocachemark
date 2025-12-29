@@ -31,33 +31,33 @@ func WriteMarkdown(filename string, results Results, commandLine string) error {
 	// Hit Rate
 	if results.HitRate != nil {
 		w("## Hit Rate Benchmarks\n\n")
-		writeHitRateMarkdown(w, "CDN", results.HitRate.CDN, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Meta", results.HitRate.Meta, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Zipf", results.HitRate.Zipf, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Twitter", results.HitRate.Twitter, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Wikipedia", results.HitRate.Wikipedia, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Thesios Block", results.HitRate.ThesiosBlock, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Thesios File", results.HitRate.ThesiosFile, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "IBM Docker", results.HitRate.IBMDocker, results.HitRate.Sizes)
-		writeHitRateMarkdown(w, "Tencent Photo", results.HitRate.TencentPhoto, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "CDN", "cdn", results.HitRate.CDN, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Meta", "meta", results.HitRate.Meta, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Zipf", "zipf", results.HitRate.Zipf, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Twitter", "twitter", results.HitRate.Twitter, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Wikipedia", "wikipedia", results.HitRate.Wikipedia, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Thesios Block", "thesios-block", results.HitRate.ThesiosBlock, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Thesios File", "thesios-file", results.HitRate.ThesiosFile, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "IBM Docker", "ibm-docker", results.HitRate.IBMDocker, results.HitRate.Sizes)
+		writeHitRateMarkdown(w, "Tencent Photo", "tencent-photo", results.HitRate.TencentPhoto, results.HitRate.Sizes)
 	}
 
 	// Latency
 	if results.Latency != nil {
 		w("## Latency Benchmarks\n\n")
-		writeLatencyMarkdown(w, "String Keys", results.Latency.Results)
-		writeLatencyMarkdown(w, "Int Keys", results.Latency.IntResults)
-		writeGetOrSetLatencyMarkdown(w, results.Latency.GetOrSetResults)
+		writeLatencyMarkdown(w, "String Keys", "string", results.Latency.Results)
+		writeLatencyMarkdown(w, "Int Keys", "int", results.Latency.IntResults)
+		writeGetOrSetLatencyMarkdown(w, "getorset", results.Latency.GetOrSetResults)
 	}
 
 	// Throughput
 	if results.Throughput != nil {
 		w("## Throughput Benchmarks\n\n")
-		writeThroughputMarkdown(w, "String Get", results.Throughput.StringGetResults, results.Throughput.Threads)
-		writeThroughputMarkdown(w, "String Set", results.Throughput.StringSetResults, results.Throughput.Threads)
-		writeThroughputMarkdown(w, "Int Get", results.Throughput.IntGetResults, results.Throughput.Threads)
-		writeThroughputMarkdown(w, "Int Set", results.Throughput.IntSetResults, results.Throughput.Threads)
-		writeThroughputMarkdown(w, "GetOrSet", results.Throughput.GetOrSetResults, results.Throughput.Threads)
+		writeThroughputMarkdown(w, "String Get", "string-get-throughput", results.Throughput.StringGetResults, results.Throughput.Threads)
+		writeThroughputMarkdown(w, "String Set", "string-set-throughput", results.Throughput.StringSetResults, results.Throughput.Threads)
+		writeThroughputMarkdown(w, "Int Get", "int-get-throughput", results.Throughput.IntGetResults, results.Throughput.Threads)
+		writeThroughputMarkdown(w, "Int Set", "int-set-throughput", results.Throughput.IntSetResults, results.Throughput.Threads)
+		writeThroughputMarkdown(w, "GetOrSet", "getorset-throughput", results.Throughput.GetOrSetResults, results.Throughput.Threads)
 	}
 
 	// Memory
@@ -80,12 +80,12 @@ func WriteMarkdown(filename string, results Results, commandLine string) error {
 	return nil
 }
 
-func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.HitRateResult, sizes []int) {
+func writeHitRateMarkdown(w func(string, ...any), name, testName string, data []benchmark.HitRateResult, sizes []int) {
 	if len(data) == 0 {
 		return
 	}
 
-	w("### %s\n\n", name)
+	w("### [%s] %s\n\n", testName, name)
 
 	// Header
 	w("| Cache         |")
@@ -126,25 +126,25 @@ func writeHitRateMarkdown(w func(string, ...any), name string, data []benchmark.
 		winners, runnerUp := FormatWinners(entries)
 
 		if len(winners) > 1 {
-			w("\n  winners (tie): %s", strings.Join(winners, ", "))
+			w("\n**Winners (tie):** %s", strings.Join(winners, ", "))
 		} else {
-			w("\n  winner: %s", winners[0])
+			w("\n**Winner:** %s", winners[0])
 		}
 		if runnerUp != nil {
-			pct := (entries[0].Score - runnerUp.Score) / runnerUp.Score * 100
-			w(" (+%.3f%% vs %s)", pct, runnerUp.Name)
+			diff := entries[0].Score - runnerUp.Score
+			w(" (+%.3f%% vs %s)", diff, runnerUp.Name)
 		}
 		w("\n")
 	}
 	w("\n")
 }
 
-func writeLatencyMarkdown(w func(string, ...any), title string, data []benchmark.LatencyResult) {
+func writeLatencyMarkdown(w func(string, ...any), title, testName string, data []benchmark.LatencyResult) {
 	if len(data) == 0 {
 		return
 	}
 
-	w("### %s\n\n", title)
+	w("### [%s] %s\n\n", testName, title)
 	w("| Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc |    Avg ns |\n")
 	w("|---------------|--------|-----------|--------|-----------|-------------|----------------|----------|\n")
 
@@ -181,12 +181,12 @@ func writeLatencyMarkdown(w func(string, ...any), title string, data []benchmark
 	w("\n")
 }
 
-func writeGetOrSetLatencyMarkdown(w func(string, ...any), data []benchmark.GetOrSetLatencyResult) {
+func writeGetOrSetLatencyMarkdown(w func(string, ...any), testName string, data []benchmark.GetOrSetLatencyResult) {
 	if len(data) == 0 {
 		return
 	}
 
-	w("### GetOrSet\n\n")
+	w("### [%s] GetOrSet\n\n", testName)
 	w("| Cache         | GetOrSet ns | GetOrSet alloc |\n")
 	w("|---------------|-------------|----------------|\n")
 
@@ -222,12 +222,12 @@ func writeGetOrSetLatencyMarkdown(w func(string, ...any), data []benchmark.GetOr
 	w("\n")
 }
 
-func writeThroughputMarkdown(w func(string, ...any), name string, data []benchmark.ThroughputResult, threads []int) {
+func writeThroughputMarkdown(w func(string, ...any), name, testName string, data []benchmark.ThroughputResult, threads []int) {
 	if len(data) == 0 {
 		return
 	}
 
-	w("### %s\n\n", name)
+	w("### [%s] %s\n\n", testName, name)
 
 	// Header
 	w("| Cache         |")

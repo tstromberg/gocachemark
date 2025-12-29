@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-//go:embed testdata/tencent_photo_2m.txt.zst
+//go:embed testdata/tencent_photo_trace.csv.zst
 var tencentPhotoTraceCompressed []byte
 
 var (

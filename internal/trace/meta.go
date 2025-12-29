@@ -10,7 +10,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-//go:embed testdata/meta_trace_3m.csv.zst
+//go:embed testdata/meta_trace.csv.zst
 var metaTraceCompressed []byte
 
 // Op represents a single cache operation from a trace.

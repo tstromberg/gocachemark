@@ -172,6 +172,8 @@ linters:
         - name: add-constant
           severity: warning
           disabled: true
+        - name: call-to-gc
+          disabled: true # intentional in memory benchmark
         - name: cognitive-complexity
           disabled: true # prefer maintidx
         - name: cyclomatic

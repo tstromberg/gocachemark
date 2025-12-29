@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-//go:embed testdata/wiki_trace_2m.csv.zst
+//go:embed testdata/wiki_trace.csv.zst
 var wikipediaTraceCompressed []byte
 
 var (

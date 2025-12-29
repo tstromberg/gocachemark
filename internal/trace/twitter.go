@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-//go:embed testdata/twitter_trace_2m.csv.zst
+//go:embed testdata/twitter_trace.csv.zst
 var twitterTraceCompressed []byte
 
 var (

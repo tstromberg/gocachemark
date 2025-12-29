@@ -113,20 +113,6 @@ type jsonThroughputResult struct {
 
 // WriteJSON writes benchmark results to a JSON file.
 func WriteJSON(filename string, results Results, commandLine string) error {
-	jr := convertToJSON(results, commandLine)
-
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close() //nolint:errcheck // best-effort close
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	return enc.Encode(jr)
-}
-
-func convertToJSON(results Results, commandLine string) jsonResults {
 	jr := jsonResults{
 		Timestamp:   time.Now().Format(time.RFC3339),
 		MachineInfo: results.MachineInfo,
@@ -150,7 +136,15 @@ func convertToJSON(results Results, commandLine string) jsonResults {
 		jr.MedalTable = convertMedalTable(results.MedalTable)
 	}
 
-	return jr
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close() //nolint:errcheck // best-effort close
+
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
+	return enc.Encode(jr)
 }
 
 func convertMedalTable(mt *MedalTable) *jsonMedalTable {
@@ -292,11 +286,7 @@ func convertCategorySummary(summaries []CategorySummary) []jsonCategorySummary {
 	}
 	out := make([]jsonCategorySummary, len(summaries))
 	for i, s := range summaries {
-		out[i] = jsonCategorySummary{
-			Name:          s.Name,
-			Value:         s.Value,
-			DiffFromFirst: s.DiffFromFirst,
-		}
+		out[i] = jsonCategorySummary(s)
 	}
 	return out
 }

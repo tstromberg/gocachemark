@@ -44,28 +44,25 @@ func parseIntList(input string, multiplier int) []int {
 
 // printLatencyTable prints a formatted latency results table with winner.
 func printLatencyTable(results []benchmark.LatencyResult) {
-	avgLatency := func(r benchmark.LatencyResult) float64 {
-		return (r.GetNsOp + r.SetNsOp) / 2
-	}
-
 	sorted := make([]benchmark.LatencyResult, len(results))
 	copy(sorted, results)
 	sort.Slice(sorted, func(i, j int) bool {
-		return avgLatency(sorted[i]) < avgLatency(sorted[j])
+		return (sorted[i].GetNsOp + sorted[i].SetNsOp) < (sorted[j].GetNsOp + sorted[j].SetNsOp)
 	})
 
 	fmt.Println("  | Cache         | Get ns | Get alloc | Set ns | Set alloc | SetEvict ns | SetEvict alloc |    Avg ns |")
 	fmt.Println("  |---------------|--------|-----------|--------|-----------|-------------|----------------|-----------|")
 
 	for _, r := range sorted {
+		avg := (r.GetNsOp + r.SetNsOp) / 2
 		fmt.Printf("  | %-13s | %6.0f | %9d | %6.0f | %9d | %11.0f | %14d | %9.3f |\n",
-			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avgLatency(r))
+			r.Name, r.GetNsOp, r.GetAllocs, r.SetNsOp, r.SetAllocs, r.SetEvictNsOp, r.SetEvictAllocs, avg)
 	}
 
 	if len(sorted) >= 1 {
 		entries := make([]output.WinnerEntry, len(sorted))
 		for i, r := range sorted {
-			entries[i] = output.WinnerEntry{Name: r.Name, Score: avgLatency(r)}
+			entries[i] = output.WinnerEntry{Name: r.Name, Score: (r.GetNsOp + r.SetNsOp) / 2}
 		}
 		winners, runnerUp := output.FormatWinners(entries)
 		bestScore := entries[0].Score

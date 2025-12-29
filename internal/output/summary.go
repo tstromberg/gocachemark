@@ -64,7 +64,7 @@ func ComputeHitRateSummary(data *HitRateData) ([]CategorySummary, int, bool) {
 		})
 	}
 
-	if len(out) < 2 {
+	if len(out) == 0 {
 		return nil, 0, false
 	}
 
@@ -139,7 +139,7 @@ func ComputeLatencySummary(data *LatencyData) ([]CategorySummary, int, bool) {
 		})
 	}
 
-	if len(out) < 2 {
+	if len(out) == 0 {
 		return nil, 0, false
 	}
 
@@ -228,7 +228,7 @@ func ComputeThroughputSummary(data *ThroughputData) ([]CategorySummary, int, boo
 		})
 	}
 
-	if len(out) < 2 {
+	if len(out) == 0 {
 		return nil, 0, false
 	}
 

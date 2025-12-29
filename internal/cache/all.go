@@ -17,6 +17,7 @@ var registry = map[string]Factory{
 	"s4lru":         NewS4LRU,
 	"clock":         NewClock,
 	"lru":           NewLRU,
+	"hypercache":    NewHypercache,
 }
 
 // sizedRegistry maps cache names to their sized factory functions.
@@ -39,6 +40,7 @@ var defaultOrder = []string{
 	"multicache",
 	"otter", "theine", "ttlcache", "ristretto", "tinylfu", "sieve", "s3-fifo",
 	"freelru-shard", "freelru-sync", "freecache", "2q", "s4lru", "clock", "lru",
+	"hypercache",
 }
 
 // intOrder defines the display order for int-keyed caches.

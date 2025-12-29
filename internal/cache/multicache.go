@@ -23,13 +23,14 @@ func (*multicacheCache) Name() string {
 	return "multicache"
 }
 
-func (c *multicacheCache) Close() {
-	c.c.Close()
-}
+func (*multicacheCache) Close() {}
 
 func (c *multicacheCache) GetOrSet(key, value string) string {
-	result, _ := c.c.SetIfAbsent(key, value)
-	return result
+	if v, ok := c.c.Get(key); ok {
+		return v
+	}
+	c.c.Set(key, value)
+	return value
 }
 
 type multicacheIntCache struct {
@@ -53,11 +54,12 @@ func (*multicacheIntCache) Name() string {
 	return "multicache"
 }
 
-func (c *multicacheIntCache) Close() {
-	c.c.Close()
-}
+func (*multicacheIntCache) Close() {}
 
 func (c *multicacheIntCache) GetOrSet(key, value int) int {
-	result, _ := c.c.SetIfAbsent(key, value)
-	return result
+	if v, ok := c.c.Get(key); ok {
+		return v
+	}
+	c.c.Set(key, value)
+	return value
 }

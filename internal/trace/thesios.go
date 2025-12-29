@@ -11,8 +11,11 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-//go:embed testdata/thesios_trace.csv.zst
-var thesiosTraceCompressed []byte
+//go:embed testdata/thesios_trace_part1.csv.zst
+var thesiosTracePart1 []byte
+
+//go:embed testdata/thesios_trace_part2.csv.zst
+var thesiosTracePart2 []byte
 
 var (
 	thesiosBlockOps  []string
@@ -23,12 +26,12 @@ var (
 
 // ThesiosBlockInfo returns information about the Thesios block trace.
 func ThesiosBlockInfo() string {
-	return "Google Thesios I/O block trace (1.7M reads, ~1.3M unique blocks)"
+	return "Google Thesios I/O block trace (15.3M reads, ~10.2M unique blocks)"
 }
 
 // ThesiosFileInfo returns information about the Thesios file trace.
 func ThesiosFileInfo() string {
-	return "Google Thesios I/O file trace (1.4M reads, ~131K unique files, sequential deduped)"
+	return "Google Thesios I/O file trace (15.3M reads, ~603K unique files, sequential deduped)"
 }
 
 func loadThesiosTrace() {
@@ -40,15 +43,25 @@ func loadThesiosTrace() {
 		}
 		defer decoder.Close()
 
-		decompressed, err := decoder.DecodeAll(thesiosTraceCompressed, nil)
+		part1, err := decoder.DecodeAll(thesiosTracePart1, nil)
 		if err != nil {
-			errThesiosTrace = fmt.Errorf("decompress trace: %w", err)
+			errThesiosTrace = fmt.Errorf("decompress part 1: %w", err)
 			return
 		}
 
+		part2, err := decoder.DecodeAll(thesiosTracePart2, nil)
+		if err != nil {
+			errThesiosTrace = fmt.Errorf("decompress part 2: %w", err)
+			return
+		}
+
+		decompressed := make([]byte, len(part1)+len(part2))
+		copy(decompressed, part1)
+		copy(decompressed[len(part1):], part2)
+
 		scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
-		blockOps := make([]string, 0, 1_800_000)
-		fileOps := make([]string, 0, 1_400_000)
+		blockOps := make([]string, 0, 16_000_000)
+		fileOps := make([]string, 0, 12_000_000)
 
 		var lastFile string
 		var lastOffset int64 = -1

@@ -13,28 +13,35 @@ import (
 
 // loadSimpleTrace decompresses zstd data and parses lines as string keys.
 func loadSimpleTrace(compressed []byte, capacity int) ([]string, error) {
+	return loadMultiPartTrace(capacity, compressed)
+}
+
+// loadMultiPartTrace decompresses multiple zstd-compressed parts and parses lines as string keys.
+func loadMultiPartTrace(capacity int, parts ...[]byte) ([]string, error) {
 	decoder, err := zstd.NewReader(nil)
 	if err != nil {
 		return nil, fmt.Errorf("create zstd decoder: %w", err)
 	}
 	defer decoder.Close()
 
-	decompressed, err := decoder.DecodeAll(compressed, nil)
-	if err != nil {
-		return nil, fmt.Errorf("decompress trace: %w", err)
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
 	ops := make([]string, 0, capacity)
 
-	for scanner.Scan() {
-		if key := scanner.Text(); key != "" {
-			ops = append(ops, key)
+	for i, part := range parts {
+		decompressed, err := decoder.DecodeAll(part, nil)
+		if err != nil {
+			return nil, fmt.Errorf("decompress part %d: %w", i+1, err)
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan trace: %w", err)
+		scanner := bufio.NewScanner(strings.NewReader(string(decompressed)))
+		for scanner.Scan() {
+			if key := scanner.Text(); key != "" {
+				ops = append(ops, key)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("scan part %d: %w", i+1, err)
+		}
 	}
 
 	return ops, nil

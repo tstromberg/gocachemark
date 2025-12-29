@@ -116,7 +116,7 @@ func WriteJSON(filename string, results Results, commandLine string) error {
 	jr := jsonResults{
 		Timestamp:   time.Now().Format(time.RFC3339),
 		MachineInfo: results.MachineInfo,
-		Rankings:    results.Rankings,
+		Rankings:    convertRankings(results.Rankings),
 	}
 	jr.MachineInfo.CommandLine = commandLine
 
@@ -162,7 +162,7 @@ func convertMedalTable(mt *MedalTable) *jsonMedalTable {
 			rankings[j] = jsonCategoryRank{
 				Rank:   r.Rank,
 				Name:   r.Name,
-				Score:  score,
+				Score:  Round3(score),
 				Gold:   r.Gold,
 				Silver: r.Silver,
 				Bronze: r.Bronze,
@@ -201,10 +201,14 @@ func convertHitRateResults(results []benchmark.HitRateResult, sizes []int) []jso
 	}
 	out := make([]jsonHitRateResult, len(results))
 	for i, r := range results {
+		rates := make(map[int]float64, len(r.Rates))
+		for k, v := range r.Rates {
+			rates[k] = Round3(v)
+		}
 		out[i] = jsonHitRateResult{
 			Name:    r.Name,
-			Rates:   r.Rates,
-			AvgRate: AvgHitRate(r, sizes),
+			Rates:   rates,
+			AvgRate: Round3(AvgHitRate(r, sizes)),
 		}
 	}
 	return out
@@ -216,33 +220,33 @@ func convertLatency(lat *LatencyData) *jsonLatencyData {
 	for _, r := range lat.Results {
 		jl.StringKeys = append(jl.StringKeys, jsonLatencyResult{
 			Name:           r.Name,
-			GetNsOp:        r.GetNsOp,
+			GetNsOp:        Round3(r.GetNsOp),
 			GetAllocs:      r.GetAllocs,
-			SetNsOp:        r.SetNsOp,
+			SetNsOp:        Round3(r.SetNsOp),
 			SetAllocs:      r.SetAllocs,
-			SetEvictNsOp:   r.SetEvictNsOp,
+			SetEvictNsOp:   Round3(r.SetEvictNsOp),
 			SetEvictAllocs: r.SetEvictAllocs,
-			AvgNsOp:        (r.GetNsOp + r.SetNsOp) / 2,
+			AvgNsOp:        Round3((r.GetNsOp + r.SetNsOp) / 2),
 		})
 	}
 
 	for _, r := range lat.IntResults {
 		jl.IntKeys = append(jl.IntKeys, jsonLatencyResult{
 			Name:           r.Name,
-			GetNsOp:        r.GetNsOp,
+			GetNsOp:        Round3(r.GetNsOp),
 			GetAllocs:      r.GetAllocs,
-			SetNsOp:        r.SetNsOp,
+			SetNsOp:        Round3(r.SetNsOp),
 			SetAllocs:      r.SetAllocs,
-			SetEvictNsOp:   r.SetEvictNsOp,
+			SetEvictNsOp:   Round3(r.SetEvictNsOp),
 			SetEvictAllocs: r.SetEvictAllocs,
-			AvgNsOp:        (r.GetNsOp + r.SetNsOp) / 2,
+			AvgNsOp:        Round3((r.GetNsOp + r.SetNsOp) / 2),
 		})
 	}
 
 	for _, r := range lat.GetOrSetResults {
 		jl.GetOrSet = append(jl.GetOrSet, jsonGetOrSetResult{
 			Name:   r.Name,
-			NsOp:   r.NsOp,
+			NsOp:   Round3(r.NsOp),
 			Allocs: r.Allocs,
 		})
 	}
@@ -271,10 +275,14 @@ func convertThroughputResults(results []benchmark.ThroughputResult) []jsonThroug
 	}
 	out := make([]jsonThroughputResult, len(results))
 	for i, r := range results {
+		qps := make(map[int]float64, len(r.QPS))
+		for k, v := range r.QPS {
+			qps[k] = Round3(v)
+		}
 		out[i] = jsonThroughputResult{
 			Name:   r.Name,
-			QPS:    r.QPS,
-			AvgQPS: avgQPS(r),
+			QPS:    qps,
+			AvgQPS: Round3(avgQPS(r)),
 		}
 	}
 	return out
@@ -286,7 +294,29 @@ func convertCategorySummary(summaries []CategorySummary) []jsonCategorySummary {
 	}
 	out := make([]jsonCategorySummary, len(summaries))
 	for i, s := range summaries {
-		out[i] = jsonCategorySummary(s)
+		out[i] = jsonCategorySummary{
+			Name:          s.Name,
+			Value:         Round3(s.Value),
+			DiffFromFirst: Round3(s.DiffFromFirst),
+		}
+	}
+	return out
+}
+
+func convertRankings(rankings []Ranking) []Ranking {
+	if len(rankings) == 0 {
+		return nil
+	}
+	out := make([]Ranking, len(rankings))
+	for i, r := range rankings {
+		out[i] = Ranking{
+			Name:   r.Name,
+			Rank:   r.Rank,
+			Score:  Round3(r.Score),
+			Gold:   r.Gold,
+			Silver: r.Silver,
+			Bronze: r.Bronze,
+		}
 	}
 	return out
 }

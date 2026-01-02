@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"runtime"
@@ -18,6 +19,8 @@ import (
 	"github.com/dgryski/go-s4lru"
 	"github.com/elastic/go-freelru"
 	lru2 "github.com/hashicorp/golang-lru/v2"
+	"github.com/hyp3rd/hypercache"
+	"github.com/hyp3rd/hypercache/pkg/backend"
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/maypok86/otter/v2"
 	"github.com/scalalang2/golang-fifo/s3fifo"
@@ -40,7 +43,11 @@ func main() {
 	runtime.GC()
 	debug.FreeOSMemory()
 
-	items, data := runBenchmark(*cacheName, *capacity, *valSize)
+	items, data, err := runBenchmark(*cacheName, *capacity, *valSize)
+	if err != nil {
+		fmt.Printf(`{"error":%q}`, err.Error())
+		return
+	}
 
 	runtime.GC()
 	time.Sleep(100 * time.Millisecond)
@@ -57,7 +64,7 @@ func main() {
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional for memory measurement
-func runBenchmark(name string, capacity, valSize int) (int, any) {
+func runBenchmark(name string, capacity, valSize int) (int, any, error) {
 	switch name {
 	case "baseline":
 		return runBaseline(capacity, valSize)
@@ -91,13 +98,15 @@ func runBenchmark(name string, capacity, valSize int) (int, any) {
 		return runLRU(capacity, valSize)
 	case "ttlcache":
 		return runTTLCache(capacity, valSize)
+	case "hypercache":
+		return runHypercache(capacity, valSize)
 	default:
-		return 0, nil
+		return 0, nil, fmt.Errorf("unknown cache: %s (add case to cmd/mem/main.go)", name)
 	}
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runBaseline(capacity, valSize int) (int, any) {
+func runBaseline(capacity, valSize int) (int, any, error) {
 	m := make(map[string][]byte, capacity)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -108,11 +117,11 @@ func runBaseline(capacity, valSize int) (int, any) {
 		}
 		m[key] = val
 	}
-	return len(m), m
+	return len(m), m, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runFido(capacity, valSize int) (int, any) {
+func runFido(capacity, valSize int) (int, any, error) {
 	c := fido.New[string, []byte](fido.Size(capacity))
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -122,11 +131,11 @@ func runFido(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runOtter(capacity, valSize int) (int, any) {
+func runOtter(capacity, valSize int) (int, any, error) {
 	c := otter.Must(&otter.Options[string, []byte]{MaximumSize: capacity})
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -136,11 +145,11 @@ func runOtter(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val)
 	}
-	return c.EstimatedSize(), c
+	return c.EstimatedSize(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runTheine(capacity, valSize int) (int, any) {
+func runTheine(capacity, valSize int) (int, any, error) {
 	c, _ := theine.NewBuilder[string, []byte](int64(capacity)).Build() //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -150,11 +159,11 @@ func runTheine(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val, 0)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runRistretto(capacity, valSize int) (int, any) {
+func runRistretto(capacity, valSize int) (int, any, error) {
 	c, _ := ristretto.NewCache(&ristretto.Config{ //nolint:errcheck // capacity always valid
 		NumCounters:        int64(capacity * 10),
 		MaxCost:            int64(capacity),
@@ -185,7 +194,7 @@ func runRistretto(capacity, valSize int) (int, any) {
 			count++
 		}
 	}
-	return count, c
+	return count, c, nil
 }
 
 type tinyLFUWrapper struct {
@@ -193,7 +202,7 @@ type tinyLFUWrapper struct {
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runTinyLFU(capacity, valSize int) (int, any) {
+func runTinyLFU(capacity, valSize int) (int, any, error) {
 	// Use non-sync version - SyncT has issues with admission
 	c := tinylfu.New(capacity, capacity*10)
 	for i := range capacity {
@@ -213,11 +222,11 @@ func runTinyLFU(capacity, valSize int) (int, any) {
 			count++
 		}
 	}
-	return count, w
+	return count, w, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runSieve(capacity, valSize int) (int, any) {
+func runSieve(capacity, valSize int) (int, any, error) {
 	c := sieve.New[string, []byte](capacity, 0)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -227,11 +236,11 @@ func runSieve(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runS3FIFO(capacity, valSize int) (int, any) {
+func runS3FIFO(capacity, valSize int) (int, any, error) {
 	c := s3fifo.New[string, []byte](capacity, 0)
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -241,7 +250,7 @@ func runS3FIFO(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 func hashString(s string) uint32 {
@@ -249,7 +258,7 @@ func hashString(s string) uint32 {
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runFreeLRUSharded(capacity, valSize int) (int, any) {
+func runFreeLRUSharded(capacity, valSize int) (int, any, error) {
 	c, _ := freelru.NewSharded[string, []byte](uint32(capacity), hashString) //nolint:errcheck,gosec // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -259,11 +268,11 @@ func runFreeLRUSharded(capacity, valSize int) (int, any) {
 		}
 		c.Add(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runFreeLRUSynced(capacity, valSize int) (int, any) {
+func runFreeLRUSynced(capacity, valSize int) (int, any, error) {
 	c, _ := freelru.NewSynced[string, []byte](uint32(capacity), hashString) //nolint:errcheck,gosec // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -273,11 +282,11 @@ func runFreeLRUSynced(capacity, valSize int) (int, any) {
 		}
 		c.Add(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runFreecache(capacity, valSize int) (int, any) {
+func runFreecache(capacity, valSize int) (int, any, error) {
 	overhead := 256
 	size := capacity * (valSize + overhead)
 	c := freecache.NewCache(size)
@@ -289,11 +298,11 @@ func runFreecache(capacity, valSize int) (int, any) {
 		}
 		c.Set([]byte(key), val, 0) //nolint:errcheck,gosec // best-effort set
 	}
-	return int(c.EntryCount()), c
+	return int(c.EntryCount()), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runTwoQueue(capacity, valSize int) (int, any) {
+func runTwoQueue(capacity, valSize int) (int, any, error) {
 	c, _ := lru2.New2Q[string, []byte](capacity) //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -303,11 +312,11 @@ func runTwoQueue(capacity, valSize int) (int, any) {
 		}
 		c.Add(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runS4LRU(capacity, valSize int) (int, any) {
+func runS4LRU(capacity, valSize int) (int, any, error) {
 	// s4lru divides capacity across 4 segments, so multiply by 4
 	c := s4lru.New(capacity * 4)
 	for i := range capacity {
@@ -318,11 +327,11 @@ func runS4LRU(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runClock(capacity, valSize int) (int, any) {
+func runClock(capacity, valSize int) (int, any, error) {
 	c := clock.NewCache[string, []byte](clock.WithCapacity(capacity))
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -332,11 +341,11 @@ func runClock(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runLRU(capacity, valSize int) (int, any) {
+func runLRU(capacity, valSize int) (int, any, error) {
 	c, _ := lru2.New[string, []byte](capacity) //nolint:errcheck // capacity always valid
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
@@ -346,11 +355,11 @@ func runLRU(capacity, valSize int) (int, any) {
 		}
 		c.Add(key, val)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runTTLCache(capacity, valSize int) (int, any) {
+func runTTLCache(capacity, valSize int) (int, any, error) {
 	c := ttlcache.New[string, []byte](
 		ttlcache.WithCapacity[string, []byte](uint64(capacity)),
 		ttlcache.WithTTL[string, []byte](time.Hour),
@@ -365,5 +374,35 @@ func runTTLCache(capacity, valSize int) (int, any) {
 		}
 		c.Set(key, val, ttlcache.DefaultTTL)
 	}
-	return c.Len(), c
+	return c.Len(), c, nil
+}
+
+//nolint:gocritic // unnamed results and eval order are intentional
+func runHypercache(capacity, valSize int) (int, any, error) {
+	config := hypercache.NewConfig[backend.InMemory]("in-memory")
+	config.InMemoryOptions = []backend.Option[backend.InMemory]{
+		backend.WithCapacity[backend.InMemory](capacity),
+	}
+	c, err := hypercache.New(context.Background(), hypercache.GetDefaultManager(), config)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	for i := range capacity {
+		key := "key-" + strconv.Itoa(i)
+		val := make([]byte, valSize)
+		for j := range val {
+			val[j] = byte(i + j)
+		}
+		c.Set(context.Background(), key, val, time.Hour) //nolint:errcheck,gosec // best-effort set
+	}
+
+	count := 0
+	for i := range capacity {
+		key := "key-" + strconv.Itoa(i)
+		if _, ok := c.Get(context.Background(), key); ok {
+			count++
+		}
+	}
+	return count, c, nil
 }

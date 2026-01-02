@@ -1,8 +1,8 @@
 # gocachemark
 
-A modern (2025) benchmarking tool for comparing Go cache implementations.
+A modern (2026) benchmarking tool for comparing Go cache implementations.
 
-## Latest Results (December 8, 2025)
+## Latest Results (Januarr 2026)
 
 [![Latest benchmark results](latest/screenshot-small.png)](https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.pdf)
 

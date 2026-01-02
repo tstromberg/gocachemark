@@ -26,11 +26,8 @@ func (*fidoCache) Name() string {
 func (*fidoCache) Close() {}
 
 func (c *fidoCache) GetOrSet(key, value string) string {
-	if v, ok := c.c.Get(key); ok {
-		return v
-	}
-	c.c.Set(key, value)
-	return value
+	v, _ := c.c.Fetch(key, func() (string, error) { return value, nil }) //nolint:errcheck // loader never returns error
+	return v
 }
 
 type fidoIntCache struct {
@@ -57,9 +54,6 @@ func (*fidoIntCache) Name() string {
 func (*fidoIntCache) Close() {}
 
 func (c *fidoIntCache) GetOrSet(key, value int) int {
-	if v, ok := c.c.Get(key); ok {
-		return v
-	}
-	c.c.Set(key, value)
-	return value
+	v, _ := c.c.Fetch(key, func() (int, error) { return value, nil }) //nolint:errcheck // loader never returns error
+	return v
 }

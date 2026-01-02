@@ -16,7 +16,8 @@ func (c *tinyLFUCache) Get(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return v.(string), true //nolint:errcheck,revive // type is known from Set
+	s, ok := v.(string)
+	return s, ok
 }
 
 func (c *tinyLFUCache) Set(key, value string) {

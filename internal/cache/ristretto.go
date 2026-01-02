@@ -22,7 +22,8 @@ func (c *ristrettoCache) Get(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return v.(string), true //nolint:errcheck,revive // type is known from Set
+	s, ok := v.(string)
+	return s, ok
 }
 
 func (c *ristrettoCache) Set(key, value string) {

@@ -33,7 +33,8 @@ func (c *hypercacheCache) Get(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return v.(string), true //nolint:errcheck,revive // type is known from Set
+	s, ok := v.(string)
+	return s, ok
 }
 
 func (c *hypercacheCache) Set(key, value string) {
@@ -53,5 +54,6 @@ func (c *hypercacheCache) GetOrSet(key, value string) string {
 	if err != nil {
 		return value
 	}
-	return result.(string) //nolint:errcheck,revive // type is known from Set
+	s, _ := result.(string) //nolint:errcheck,revive // type assertion, not error
+	return s
 }

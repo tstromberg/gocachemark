@@ -12,7 +12,7 @@ import (
 
 	"github.com/Code-Hex/go-generics-cache/policy/clock"
 	"github.com/Yiling-J/theine-go"
-	"github.com/codeGROOVE-dev/multicache"
+	"github.com/codeGROOVE-dev/fido"
 	"github.com/coocood/freecache"
 	"github.com/dgraph-io/ristretto"
 	"github.com/dgryski/go-s4lru"
@@ -61,8 +61,8 @@ func runBenchmark(name string, capacity, valSize int) (int, any) {
 	switch name {
 	case "baseline":
 		return runBaseline(capacity, valSize)
-	case "multicache":
-		return runMulticache(capacity, valSize)
+	case "fido":
+		return runFido(capacity, valSize)
 	case "otter":
 		return runOtter(capacity, valSize)
 	case "theine":
@@ -112,8 +112,8 @@ func runBaseline(capacity, valSize int) (int, any) {
 }
 
 //nolint:gocritic // unnamed results and eval order are intentional
-func runMulticache(capacity, valSize int) (int, any) {
-	c := multicache.New[string, []byte](multicache.Size(capacity))
+func runFido(capacity, valSize int) (int, any) {
+	c := fido.New[string, []byte](fido.Size(capacity))
 	for i := range capacity {
 		key := "key-" + strconv.Itoa(i)
 		val := make([]byte, valSize)

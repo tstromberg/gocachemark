@@ -338,7 +338,7 @@ var templateFuncs = template.FuncMap{
 }
 
 var cacheColors = map[string]string{
-	"multicache":    "#2E7D32",
+	"fido":          "#2E7D32",
 	"otter":         "#1976D2",
 	"theine":        "#D32F2F",
 	"ristretto":     "#7B1FA2",

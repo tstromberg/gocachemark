@@ -7,7 +7,7 @@ A modern (2025) benchmarking tool for comparing Go cache implementations.
 [![Latest benchmark results](latest/screenshot-small.png)](https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.pdf)
 
 **Top 3 performers:**
-1. **multicache** - 100 points
+1. **fido** - 100 points
 2. **otter** - 60 points
 3. **freelru-shard** - 35 points
 
@@ -25,7 +25,7 @@ View the [full benchmark report](https://github.com/tstromberg/gocachemark/blob/
 - [ristretto](https://github.com/dgraph-io/ristretto) - Fast concurrent cache from Dgraph
 - [s3-fifo](https://github.com/scalalang2/golang-fifo) - S3-FIFO eviction algorithm
 - [s4lru](https://github.com/dgryski/go-s4lru) - Segmented LRU
-- [multicache](https://github.com/codeGROOVE-dev/multicache) - High-performance cache with W-TinyLFU
+- [fido](https://github.com/codeGROOVE-dev/fido) - High-performance S3-FIFO variant
 - [sieve](https://github.com/scalalang2/golang-fifo) - SIEVE eviction algorithm
 - [theine](https://github.com/Yiling-J/theine-go) - High-performance in-memory cache
 - [tinylfu](https://github.com/vmihailenco/go-tinylfu) - TinyLFU admission policy
@@ -64,7 +64,7 @@ gocachemark -all         # Run all benchmarks
 ### Examples
 
 ```bash
-gocachemark -latency -tests int -caches otter,multicache
+gocachemark -latency -tests int -caches otter,fido
 gocachemark -hitrate -tests cdn,zipf
 gocachemark -all -caches otter,theine -html results.html -open
 ```

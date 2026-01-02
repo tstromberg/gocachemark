@@ -300,7 +300,7 @@ func printUsage() {
 	fmt.Println("    memory                  Per-item memory overhead")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  gocachemark -suites latency -tests int -caches otter,multicache")
+	fmt.Println("  gocachemark -suites latency -tests int -caches otter,fido")
 	fmt.Println("  gocachemark -suites hitrate -tests cdn,zipf")
 	fmt.Println("  gocachemark -suites throughput,memory -tests string-throughput,memory")
 	fmt.Println("  gocachemark -caches otter,theine -html results.html")

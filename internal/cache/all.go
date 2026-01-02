@@ -2,7 +2,7 @@ package cache
 
 // registry maps cache names to their factory functions.
 var registry = map[string]Factory{
-	"multicache":    NewMulticache,
+	"fido":          NewFido,
 	"otter":         NewOtter,
 	"theine":        NewTheine,
 	"ttlcache":      NewTTLCache,
@@ -28,7 +28,7 @@ var sizedRegistry = map[string]SizedFactory{
 
 // intRegistry maps cache names to their int-keyed factory functions.
 var intRegistry = map[string]IntFactory{
-	"multicache":    NewMulticacheInt,
+	"fido":          NewFidoInt,
 	"otter":         NewOtterInt,
 	"theine":        NewTheineInt,
 	"ttlcache":      NewTTLCacheInt,
@@ -37,7 +37,7 @@ var intRegistry = map[string]IntFactory{
 
 // defaultOrder defines the display order for caches.
 var defaultOrder = []string{
-	"multicache",
+	"fido",
 	"otter", "theine", "ttlcache", "ristretto", "tinylfu", "sieve", "s3-fifo",
 	"freelru-shard", "freelru-sync", "freecache", "2q", "s4lru", "clock", "lru",
 	"hypercache",
@@ -45,7 +45,7 @@ var defaultOrder = []string{
 
 // intOrder defines the display order for int-keyed caches.
 var intOrder = []string{
-	"multicache", "otter", "theine", "ttlcache", "freelru-shard",
+	"fido", "otter", "theine", "ttlcache", "freelru-shard",
 }
 
 // Filter holds the current cache filter (nil = all caches).

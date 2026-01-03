@@ -5,7 +5,7 @@ go 1.25.5
 require (
 	github.com/Code-Hex/go-generics-cache v1.5.1
 	github.com/Yiling-J/theine-go v0.6.2
-	github.com/codeGROOVE-dev/fido v1.6.1
+	github.com/codeGROOVE-dev/fido v1.10.0
 	github.com/coocood/freecache v1.2.4
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/dgryski/go-s4lru v0.0.0-20150401095600-fd9b33c61bfe
@@ -31,8 +31,8 @@ require (
 	github.com/gofiber/schema v1.6.0 // indirect
 	github.com/gofiber/utils/v2 v2.0.0-rc.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/hyp3rd/ewrap v1.3.3 // indirect
-	github.com/hyp3rd/sectools v1.0.7 // indirect
+	github.com/hyp3rd/ewrap v1.3.5 // indirect
+	github.com/hyp3rd/sectools v1.0.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -43,7 +43,7 @@ require (
 	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/shamaton/msgpack/v2 v2.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/tinylib/msgp v1.6.1 // indirect
+	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect

@@ -29,29 +29,29 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofiber/fiber/v3 v3.0.0-rc.3 // indirect
 	github.com/gofiber/schema v1.6.0 // indirect
-	github.com/gofiber/utils/v2 v2.0.0-rc.5 // indirect
+	github.com/gofiber/utils/v2 v2.0.0-rc.6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hyp3rd/ewrap v1.3.5 // indirect
-	github.com/hyp3rd/sectools v1.0.8 // indirect
+	github.com/hyp3rd/sectools v1.1.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/puzpuzpuz/xsync/v4 v4.2.0 // indirect
+	github.com/puzpuzpuz/xsync/v4 v4.3.0 // indirect
 	github.com/redis/go-redis/v9 v9.17.2 // indirect
 	github.com/shamaton/msgpack/v2 v2.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.68.0 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/net v0.48.0 // indirect
+	github.com/valyala/fasthttp v1.69.0 // indirect
+	golang.org/x/crypto v0.47.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

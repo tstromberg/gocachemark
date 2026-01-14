@@ -7,11 +7,11 @@ A modern (2026) benchmarking tool for comparing Go cache implementations.
 [![Latest benchmark results](latest/screenshot-small.png)](https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.pdf)
 
 **Top 5 performers:**
-1. **fido** - 147 points
-2. **otter** - 47 points
-3. **2q** - 43 points
-4. **theine** - 42 points
-5. **s3-fifo** - 35 points
+1. **fido** - 150 points
+2. **otter** - 50 points
+3. **theine** - 49 points
+4. **2q** - 44 points
+5. **freelru-shard** - 36 points
    
 View the [full benchmark report](https://github.com/tstromberg/gocachemark/blob/main/latest/gocachemark-results.pdf) for detailed results across hit rate, latency, throughput, and memory benchmarks.
 
